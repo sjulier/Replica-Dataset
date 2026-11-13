@@ -4,6 +4,7 @@
 
 Controls: drag with the left mouse button to look around; W/A/S/D move,
 Q/E down/up, hold Shift to move faster; +/- change the exposure;
+M toggles mirrors and glass;
 R resets the view; Esc quits.
 The title bar shows the frame rate.
 """
@@ -33,7 +34,7 @@ class Viewer:
         w, h = size
         # The Renderer's own camera is only for its off-screen render(); the window
         # gets a camera matching its current size in draw().
-        self.r = Renderer(scene_dir, self._camera(w, h), atlas_format=atlas)
+        self.r = Renderer(scene_dir, self._camera(w, h), atlas_format=atlas, mirrors=True)
         self.r.exposure = exposure
 
         pos, _ = read_ply(os.path.join(scene_dir, "mesh.ply"))
@@ -89,6 +90,8 @@ class Viewer:
                     self.canvas.close()
                 elif key == "r":
                     self.reset()
+                elif key == "m":
+                    self.r.draw_mirrors = not self.r.draw_mirrors
                 elif key in ("+", "=", "-", "_"):
                     self.r.exposure *= 1.25 if key in ("+", "=") else 0.8
                     print(f"exposure {self.r.exposure:.4f}", flush=True)
@@ -138,7 +141,8 @@ class Viewer:
         self.fps_n += 1
         if now - self.fps_t > 1.0:
             fps = self.fps_n / (now - self.fps_t)
-            self.canvas.set_title(f"Replica - {fps:.0f} fps, {w}x{h}, exposure {self.r.exposure:.4f}")
+            self.canvas.set_title(f"Replica - {fps:.0f} fps, {w}x{h}, exposure {self.r.exposure:.4f}, "
+                                  f"mirrors {'on' if self.r.draw_mirrors else 'off'}")
             print(f"{fps:.0f} fps at {w}x{h}", flush=True)
             self.fps_t, self.fps_n = now, 0
 

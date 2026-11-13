@@ -117,6 +117,10 @@ window. See its README for usage, validation, performance and limitations. Run i
   within 1.6 mm median, colour 32.6 dB PSNR. That comparison also showed NICE-SLAM's
   `traj.txt` is camera-to-world in OpenCV axes, and that it was rendered at exposure 0.01
   (ReplicaViewer's default), not ReplicaRenderer's 0.025. Keep the default at 0.01.
+- Mirrors and glass (`glass.sur`) are **off by default**: NICE-SLAM's frames were rendered
+  without them. Depth inside mirrors has three modes (`surface`, the ReplicaRenderer default;
+  `sensor`, the reflected scene; `invalid`, 0); glass keeps its surface depth. No pixel
+  reference exists for mirrors yet (would need the OpenGL renderer).
 The test data used during development was `room_0`, extracted to a `replica_v1/` folder next
 to the repo (outside git).
 

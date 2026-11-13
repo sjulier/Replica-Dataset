@@ -4,7 +4,8 @@
 // no geometry shader (unavailable on Metal / MoltenVK): the vertex shader pulls
 // each quad's corners from storage buffers and emits two triangles in the same
 // order and with the same UVs as mesh-ptex.geom. Colour and metric depth are
-// written in one pass.
+// written in one pass. fs_clipped is for mirror reflections: it drops fragments
+// behind the clip plane (gl_ClipDistance in the original).
 
 struct Frame {
     mvp: mat4x4<f32>,
@@ -13,6 +14,7 @@ struct Frame {
     inv_gamma: f32,
     saturation: f32,
     tile_size: i32,
+    clip_plane: vec4<f32>,  // world-space plane; fs_clipped keeps dot(p, plane) >= 0
 };
 
 struct SubMeshInfo {
@@ -40,6 +42,7 @@ struct VsOut {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) face: u32,
     @location(2) depth: f32,
+    @location(3) clip_dist: f32,
 };
 
 @vertex
@@ -53,6 +56,7 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
     out.uv = UV[corner];
     out.face = face;
     out.depth = (frame.mv * p).z;
+    out.clip_dist = dot(p, frame.clip_plane);
     return out;
 }
 
@@ -187,8 +191,7 @@ struct FsOut {
     @location(1) depth: f32,
 };
 
-@fragment
-fn fs_main(in: VsOut) -> FsOut {
+fn shade(in: VsOut) -> FsOut {
     var c = texture_atlas(i32(in.face), in.uv * f32(frame.tile_size)).rgb;
     c *= frame.exposure;
     c = apply_saturation(c, frame.saturation);
@@ -197,4 +200,18 @@ fn fs_main(in: VsOut) -> FsOut {
     out.color = vec4<f32>(c, 1.0);
     out.depth = in.depth;
     return out;
+}
+
+@fragment
+fn fs_main(in: VsOut) -> FsOut {
+    return shade(in);
+}
+
+// A separate entry point so that the main pass, without discard, keeps early depth testing.
+@fragment
+fn fs_clipped(in: VsOut) -> FsOut {
+    if (in.clip_dist < 0.0) {
+        discard;
+    }
+    return shade(in);
 }
