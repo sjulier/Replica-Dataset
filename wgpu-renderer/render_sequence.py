@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from replica_wgpu import Camera, Renderer
+from replica_wgpu.renderer import MIRROR_DEPTH_MODES
 from replica_wgpu.scene import read_ply
 
 DEPTH_SCALE = 6553.5  # ReplicaSDK's 65535 * 0.1, and pyslam's DepthMapFactor
@@ -53,10 +54,16 @@ def main() -> None:
     ap.add_argument("--exposure", type=float, default=Renderer.exposure,
                     help="HDR exposure (default %(default)s, as the NICE-SLAM sequences)")
     ap.add_argument("--cull", choices=["back", "front", "none"], default="back")
+    ap.add_argument("--mirrors", action="store_true",
+                    help="draw the mirrors and glass of glass.sur (off: as the NICE-SLAM sequences)")
+    ap.add_argument("--mirror-depth", choices=MIRROR_DEPTH_MODES, default="surface",
+                    help="depth inside mirrors: the mirror surface (as ReplicaRenderer), the "
+                         "reflected scene (as a depth sensor), or 0 (a sensor dropout)")
     args = ap.parse_args()
 
     cam = Camera.replica_pyslam() if args.camera == "pyslam" else Camera.replica_sdk()
-    r = Renderer(args.scene_dir, cam, cull=args.cull, atlas_format=args.atlas)
+    r = Renderer(args.scene_dir, cam, cull=args.cull, atlas_format=args.atlas,
+                 mirrors=args.mirrors, mirror_depth=args.mirror_depth)
     r.exposure = args.exposure
     poses = (np.loadtxt(args.traj).reshape(-1, 4, 4) if args.traj
              else spin_trajectory(args.scene_dir, args.frames))[: args.frames]

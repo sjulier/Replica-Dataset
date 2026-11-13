@@ -33,8 +33,8 @@ z forward), the convention of NICE-SLAM's `traj.txt` (verified, see below).
 ## Viewer
 
 `pixi run view <scene>` opens a window: drag with the left mouse button to look around,
-W/A/S/D to move, Q/E down/up, Shift to move faster, +/- to change the exposure, R to reset,
-Esc to quit. The title bar shows the frame rate; it is capped at the display's refresh rate
+W/A/S/D to move, Q/E down/up, Shift to move faster, +/- to change the exposure, M to toggle
+mirrors and glass (on in the viewer), R to reset, Esc to quit. The title bar shows the frame rate; it is capped at the display's refresh rate
 (vsync), so a 75 Hz monitor shows about 75 fps. It uses
 [rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
@@ -58,6 +58,35 @@ unstable `std::sort`, which cannot be reproduced (see below).
 - **Tone mapping** as PTexMesh (exposure, saturation, gamma), with exposure **0.01**:
   ReplicaViewer's default, and what the NICE-SLAM sequences were rendered with.
   `ReplicaRenderer` uses PTexMesh's 0.025, which is much brighter (`--exposure 0.025`).
+
+## Mirrors and glass
+
+`--mirrors` (or `Renderer(..., mirrors=True)`) draws the surfaces in the scene's `glass.sur`,
+as ReplicaSDK's `MirrorRenderer`: for each surface in view, the scene is rendered reflected
+about its plane (clipped to the camera's side) and blended over the surface's polygon with
+alpha = Schlick Fresnel term on its reflectivity (1 for mirrors, room_0's frosted glass 0.3).
+Mirrors are off by default because the NICE-SLAM sequences were rendered without them (their
+frames match ours without mirrors, including at both of room_0's surfaces).
+
+Depth inside a mirror is a modelling choice, `--mirror-depth`:
+
+| mode | depth inside a mirror | models |
+|---|---|---|
+| `surface` (default) | the mirror surface | `ReplicaRenderer`, whose depth pass ignores mirrors; geometric ground truth |
+| `sensor` | the reflected scene (virtual geometry behind the mirror) | an ideal depth sensor, which sees the reflection; consistent with the colour image |
+| `invalid` | 0 | the dropouts real sensors often give at mirrors |
+
+Glass keeps its surface depth in every mode: room_0's is frosted, and what lies behind clear
+glass is not in the scans anyway. For the literature on depth sensors and mirrors, see e.g.
+Mirror3D (Tan et al., CVPR 2021), which found raw depth at mirrors missing or wrong in NYUv2,
+ScanNet and Matterport3D, and Whelan et al. (SIGGRAPH 2018), where Replica's surfaces come from.
+
+Checked on a synthetic mirror (tests) and on room_0: `sensor` depth reflected back about the
+mirror lands on real geometry inside the room. There is no pixel reference: ReplicaRenderer's
+own output with mirrors would need the OpenGL renderer (the Docker image). Like the original,
+a surface's polygon covers its whole outline, so the grid frame of room_0's mirror is drawn
+as mirror too. Cost on an M1: about +1 ms per frame close to a mirror and +3 ms with both of
+room_0's surfaces in view (each reflection pass is scissored to the surface's screen area).
 
 ## Validation against the original renderer
 
@@ -96,7 +125,6 @@ frames and `traj.txt` out of NICE-SLAM's 12 GB `Replica.zip` with HTTP range req
 - Validated against one scene (room_0) through NICE-SLAM's frames; other scenes, and the
   remaining 1.6 mm median depth difference (pixel-centre convention or quantisation), not yet
   investigated.
-- Mirrors and glass (`glass.sur`) are not rendered yet; the OpenGL renderer has a reflection pass.
 - Only HDR atlases (`*.hdr`), which is what Replica v1 ships.
 - Not yet run through pyslam itself.
 
@@ -107,4 +135,4 @@ frames and `traj.txt` out of NICE-SLAM's 12 GB `Replica.zip` with HTTP range req
 3. Ship pre-packed scenes (RGB9E5 or BC6H-compressed atlases, plus `sorted_faces.bin`) so
    students download one small scene with no conversion; check the Replica licence for
    redistribution first.
-4. Mirrors; package for pixi alongside pyslam; a live data source for pyslam.
+4. Package for pixi alongside pyslam; a live data source for pyslam.
