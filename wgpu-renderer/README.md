@@ -40,6 +40,11 @@ picks another: an adapter type (`discrete-gpu`, `integrated-gpu`, `cpu`), a back
 without a usable GPU. A name that matches nothing fails with the list of adapters present. The
 startup line `GPU: ...` shows which one is in use.
 
+Off-screen rendering (`render`, `benchmark.py`, the Python API, the tests) works on any adapter.
+The viewer window also needs the adapter to be able to draw to the screen: on the Linux test
+machine `view --adapter integrated-gpu` stops with wgpu's `Invalid surface` error (most
+likely because the monitor is on the other card), while `--adapter cpu` and the default work.
+
 ```bash
 pixi run render /path/to/replica_v1/room_0 out/room0 --adapter integrated-gpu
 REPLICA_ADAPTER=cpu pixi run python -m pytest tests     # the tests on software Vulkan
