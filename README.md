@@ -95,16 +95,30 @@ Execute `win_download.bat` to download Replica.
 ## Replica SDK
 
 ### Setup
-After installing the dependencies of [Pangolin](https://github.com/stevenlovegrove/Pangolin),
-the Replica SDK can be compiled using the build script via
+Install a C++17 compiler, CMake >= 3.22 and the system libraries:
+```bash
+# Ubuntu / Debian (also inside WSL2)
+sudo apt-get install build-essential cmake git libgl-dev libegl-dev libglew-dev libx11-dev libjpeg-dev libpng-dev
+# macOS (Homebrew); libomp is optional and only speeds up loading
+brew install cmake glew jpeg-turbo libpng libomp
+```
+Then fetch the pinned [Eigen](https://gitlab.com/libeigen/eigen) and
+[Pangolin](https://github.com/stevenlovegrove/Pangolin) submodules and build:
 ```bash
 git submodule update --init
 ./build.sh
 ```
-It requires the dependencies of
-[Pangolin](https://github.com/stevenlovegrove/Pangolin) and
-[Eigen](https://github.com/eigenteam/eigen-git-mirror)
-to be installed. If you wish to use the headless renderer ensure you have the libegl1-mesa-dev package.
+`build.sh` installs Eigen and Pangolin into `3rdparty/install` and builds the
+SDK into `build/`. Those pinned versions are preferred over any system
+installation, so all machines build against the same dependencies.
+
+Platform notes:
+- The renderer needs OpenGL 4.3. On Linux this is provided by any current GPU
+  driver, or by Mesa's software renderer (llvmpipe) when there is no GPU.
+- `ReplicaRenderer` (headless, via EGL) is only built on Linux, including WSL2.
+- On macOS `ReplicaViewer` compiles, but cannot run: Apple's OpenGL stops at 4.1.
+- Native Windows builds are not supported; use WSL2. Clone into the WSL2 file
+  system (e.g. `~/`), not under `/mnt/c`.
 
 ### ReplicaViewer
 
@@ -123,7 +137,9 @@ top left.
 
 The ReplicaRenderer shows how to render out images from a Replica for a
 programmatically defined trajectory without UI. This executable can be run
-headless on a server if so desired.
+headless on a server if so desired: on NVIDIA it renders directly on the GPU,
+with an X server (desktop Linux, WSLg) it renders through that, and otherwise
+it uses the first EGL device (e.g. Mesa's llvmpipe).
 
 ```bash
 ./build/bin/ReplicaRenderer mesh.ply textures glass.sur
