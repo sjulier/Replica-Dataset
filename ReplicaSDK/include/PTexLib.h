@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "Assert.h"
+#include "ReplicaAssert.h"
 #include "MeshData.h"
 
 #define XSTR(x) #x

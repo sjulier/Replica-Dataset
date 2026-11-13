@@ -9,9 +9,13 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <unordered_map>
+
+#ifndef MAP_POPULATE
+#define MAP_POPULATE 0 // Linux-only prefetch hint; not needed for correctness
+#endif
 
 PTexMesh::PTexMesh(const std::string& meshFile, const std::string& atlasFolder) {
   // Check everything exists
@@ -501,7 +505,7 @@ void PTexMesh::LoadAtlasData(const std::string& atlasFolder) {
     const std::string hdrFile = atlasFolder + "/" + std::to_string(i) + "-color-ptex.hdr";
 
     if (pangolin::FileExists(dxtFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(dxtFile);
+      const size_t numBytes = std::filesystem::file_size(dxtFile);
 
       // We know it's square
       const size_t dim = std::sqrt(numBytes * 2);
@@ -509,14 +513,14 @@ void PTexMesh::LoadAtlasData(const std::string& atlasFolder) {
       meshes[i]->atlas.Reinitialise(
           dim, dim, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
     } else if (pangolin::FileExists(rgbFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(rgbFile);
+      const size_t numBytes = std::filesystem::file_size(rgbFile);
 
       // We know it's square
       const size_t dim = std::sqrt(numBytes / 3);
 
       meshes[i]->atlas.Reinitialise(dim, dim, GL_RGBA8, true, 0, GL_RGB, GL_UNSIGNED_BYTE);
     } else if (pangolin::FileExists(hdrFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(hdrFile);
+      const size_t numBytes = std::filesystem::file_size(hdrFile);
 
       // We know it's square
       const size_t dim = std::sqrt(numBytes / 6);
@@ -536,7 +540,7 @@ void PTexMesh::LoadAtlasData(const std::string& atlasFolder) {
     const std::string hdrFile = atlasFolder + "/" + std::to_string(i) + "-color-ptex.hdr";
 
     if (pangolin::FileExists(dxtFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(dxtFile);
+      const size_t numBytes = std::filesystem::file_size(dxtFile);
 
       // Open file
       int fd = open(std::string(dxtFile).c_str(), O_RDONLY, 0);
@@ -558,7 +562,7 @@ void PTexMesh::LoadAtlasData(const std::string& atlasFolder) {
       munmap(mmappedData, numBytes);
       close(fd);
     } else if (pangolin::FileExists(rgbFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(rgbFile);
+      const size_t numBytes = std::filesystem::file_size(rgbFile);
 
       // Open file
       int fd = open(std::string(rgbFile).c_str(), O_RDONLY, 0);
@@ -569,7 +573,7 @@ void PTexMesh::LoadAtlasData(const std::string& atlasFolder) {
       munmap(mmappedData, numBytes);
       close(fd);
     } else if (pangolin::FileExists(hdrFile)) {
-      const size_t numBytes = std::experimental::filesystem::file_size(hdrFile);
+      const size_t numBytes = std::filesystem::file_size(hdrFile);
 
       // Open file
       int fd = open(std::string(hdrFile).c_str(), O_RDONLY, 0);

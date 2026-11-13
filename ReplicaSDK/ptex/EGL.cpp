@@ -1,6 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 #include "EGL.h"
-#include "Assert.h"
+#include "ReplicaAssert.h"
 
 #include <X11/Xlib.h>
 
