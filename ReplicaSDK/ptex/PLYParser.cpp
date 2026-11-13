@@ -1,13 +1,17 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 #include "PLYParser.h"
-#include "Assert.h"
+#include "ReplicaAssert.h"
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <set>
+
+#ifndef MAP_POPULATE
+#define MAP_POPULATE 0 // Linux-only prefetch hint; not needed for correctness
+#endif
 
 void PLYParse(MeshData& meshData, const std::string& filename) {
   std::vector<std::string> comments;
@@ -224,7 +228,7 @@ void PLYParse(MeshData& meshData, const std::string& filename) {
 
   file.close();
 
-  const size_t fileSize = std::experimental::filesystem::file_size(filename);
+  const size_t fileSize = std::filesystem::file_size(filename);
 
   int fd = open(filename.c_str(), O_RDONLY, 0);
   void* mmappedData = mmap(NULL, fileSize, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);

@@ -1,6 +1,6 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 #include "EGL.h"
-#include "Assert.h"
+#include "ReplicaAssert.h"
 
 #include <X11/Xlib.h>
 
@@ -11,10 +11,14 @@
 #include <cstring>
 
 EGLCtx::EGLCtx(const bool createCtx, const int cudaDevice, const bool createSurface)
-    : lib("libEGL.so"), createdCtx(createCtx) {
+    : lib("libEGL.so.1"), createdCtx(createCtx) {
   // Try find the DLL (we can't build on anything that doesn't have nvidia drivers without
-  // dynamically loading)
+  // dynamically loading). The versioned name is what runtime-only installs provide; the
+  // unversioned one only exists when the -dev package is installed.
   handle = dlopen(lib.c_str(), RTLD_LAZY);
+
+  if (nullptr == handle)
+    handle = dlopen("libEGL.so", RTLD_LAZY);
 
   if (nullptr == handle)
     handle = dlopen(
@@ -117,20 +121,26 @@ EGLCtx::EGLCtx(const bool createCtx, const int cudaDevice, const bool createSurf
         continue;
 
       if (cudaDevNumber == cudaDevice) {
+        foundCudaDev = true;
         break;
       }
     }
 
     PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT =
         (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
-    if(foundCudaDev) {
+    if (foundCudaDev) {
+      // NVIDIA: render directly on the requested CUDA device; no display server needed.
       display = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, eglDevs[eglDevId], 0);
-    } else {
-      Display* x11 = XOpenDisplay(NULL);
+    } else if (Display* x11 = XOpenDisplay(NULL)) {
+      // An X server is available (desktop Linux, WSLg): go through it.
       display = eglGetPlatformDisplayEXT(EGL_PLATFORM_X11_KHR, x11, 0);
+    } else {
+      // Truly headless (servers, containers): use the first EGL device. With Mesa this
+      // is a GPU via DRM, or the llvmpipe software renderer.
+      display = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, eglDevs[0], 0);
     }
     ASSERT(display != EGL_NO_DISPLAY, "Can't create EGL display");
-    
+
     EGLint major, minor;
     ASSERT(eglInitialize(display, &major, &minor), "Can't init EGL");
 
@@ -156,17 +166,19 @@ EGLCtx::EGLCtx(const bool createCtx, const int cudaDevice, const bool createSurf
           "Can't bind EGL context");
     }
 
+#ifdef HAVE_GLEW
     GLenum err = glewInit();
 
 #ifdef GLEW_ERROR_NO_GLX_DISPLAY
     if (err == GLEW_ERROR_NO_GLX_DISPLAY) {
         std::cout << "Can't initialize EGL GLEW GLX display, may crash!" << std::endl;
     }
-    else 
+    else
 #endif
     if (err != GLEW_OK) {
         ASSERT(false, "Can't initialize EGL, glewInit failing completely.");
     }
+#endif
 
     // Setup default OpenGL parameters
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
