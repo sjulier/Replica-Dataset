@@ -241,7 +241,7 @@ class Renderer:
             layout=d.create_pipeline_layout(bind_group_layouts=[self.frame_layout, self.mesh_layout]),
             vertex={"module": module, "entry_point": "vs_main", "buffers": []},
             primitive={"topology": wgpu.PrimitiveTopology.triangle_list,
-                       "front_face": front, "cull_mode": self._cull},
+                       "front_face": front, "cull_mode": "none" if reflected else self._cull},
             depth_stencil={"format": wgpu.TextureFormat.depth32float,
                            "depth_write_enabled": True,
                            "depth_compare": wgpu.CompareFunction.less},
