@@ -30,6 +30,26 @@ rgb, depth = r.render(T_world_camera)  # (680,1200,3) uint8, (680,1200) float32 
 Poses are camera-to-world with the camera axes of ReplicaSDK and OpenCV (x right, y down,
 z forward), the convention of NICE-SLAM's `traj.txt` (verified, see below).
 
+## Choosing the GPU
+
+By default the renderer takes the fastest adapter. `--adapter` (on `view`, `render` and
+`benchmark.py`), `Renderer(..., adapter=...)` or the `REPLICA_ADAPTER` environment variable
+picks another: an adapter type (`discrete-gpu`, `integrated-gpu`, `cpu`), a backend (`vulkan`,
+`metal`, `d3d12`) or any part of a device name (`5090`, `radv`, `llvmpipe`), ignoring case.
+`cpu` is a software rasteriser where one is installed (Mesa's llvmpipe on Linux), for machines
+without a usable GPU. A name that matches nothing fails with the list of adapters present. The
+startup line `GPU: ...` shows which one is in use.
+
+Off-screen rendering (`render`, `benchmark.py`, the Python API, the tests) works on any adapter.
+The viewer window also needs the adapter to be able to draw to the screen: on the Linux test
+machine `view --adapter integrated-gpu` stops with wgpu's `Invalid surface` error (most
+likely because the monitor is on the other card), while `--adapter cpu` and the default work.
+
+```bash
+pixi run render /path/to/replica_v1/room_0 out/room0 --adapter integrated-gpu
+REPLICA_ADAPTER=cpu pixi run python -m pytest tests     # the tests on software Vulkan
+```
+
 ## Viewer
 
 `pixi run view <scene>` opens a window: drag with the left mouse button or use the arrow keys
@@ -133,12 +153,34 @@ and the twigs left only a few stray pieces of mesh.
 | `rgb9e5` against `rgba16float` | PSNR 63.8 dB, max difference 3/255, depth identical |
 | peak process memory | 1.9 GB |
 
+### Linux (room_0, 1200×680, Ubuntu 26.04, Vulkan, 2026-11-13)
+
+One desktop (Ryzen 9 9950X, 32 threads) with three adapters, chosen with `--adapter`.
+`benchmark.py`, median over 30 frames of render + copy both images back, `rgba16float`:
+
+| adapter | startup | frame | with `--mirrors` | peak process memory |
+|---|---|---|---|---|
+| NVIDIA RTX 5090 (driver 595.99) | 2.0 s | 3.4 ms (292 fps) | 3.6 ms (278 fps) | 1.1 GB |
+| AMD integrated, RADV (Mesa 26.0.8) | 2.0 s | 15.3 ms (65 fps) | 15.8 ms (63 fps) | 1.1 GB |
+| llvmpipe, software (LLVM 21.1.8) | 2.2 s | 108 ms (9.2 fps) | 131 ms (7.6 fps) | 4.3 GB |
+| llvmpipe, 4 threads (`LP_NUM_THREADS=4`) | 2.2 s | 112 ms (8.9 fps) | 132 ms (7.6 fps) | 4.3 GB |
+| llvmpipe, 2 threads | 2.2 s | 135 ms (7.4 fps) | 160 ms (6.2 fps) | 4.3 GB |
+
+- Software rendering works and passes every test, at 7 to 9 frames per second here: enough to
+  pre-render sequences, slow for the viewer. It hardly depends on the thread count, but these
+  are fast cores; a laptop CPU will be slower per thread, so treat the figures as a best case.
+- Software rendering keeps the textures in ordinary memory: 4.3 GB at peak, or 2.5 GB with
+  `--atlas rgb9e5` (same frame time, 10.5 s startup for the NumPy packing).
+- On the integrated GPU `--atlas rgb9e5` is faster as well as smaller: 11.1 ms (90 fps).
+- All three adapters pass the full test suite, including the comparison with NICE-SLAM's
+  frames (`REPLICA_ADAPTER=... pytest`).
+
 ## Status and limitations
 
-- Tested only on an Apple M1 (Metal). Linux (Vulkan, and Mesa's lavapipe without a GPU),
-  Windows (D3D12) and WSL2 are untested. On WSLg, pyslam found wgpu's default surface path crashes
-  and uses software Vulkan for Rerun; off-screen rendering (no surface) may avoid that, but the
-  viewer window would not.
+- Tested on an Apple M1 (Metal) and one Linux desktop (Vulkan: NVIDIA, AMD integrated and
+  llvmpipe). Windows (D3D12), WSL2 and a real low-spec laptop are untested. On WSLg, pyslam
+  found wgpu's default surface path crashes and uses software Vulkan for Rerun; off-screen
+  rendering (no surface) may avoid that, but the viewer window would not.
 - Validated against one scene (room_0) through NICE-SLAM's frames; other scenes, and the
   remaining 1.6 mm median depth difference (pixel-centre convention or quantisation), not yet
   investigated.
@@ -147,7 +189,7 @@ and the twigs left only a few stray pieces of mesh.
 
 ## Next steps
 
-1. Run on Linux/Windows/WSL2 machines, ideally including a low-spec laptop.
+1. Run on Windows/WSL2 machines and a low-spec laptop (Linux desktop done).
 2. Docker image with the OpenGL renderer, for reference frames on other scenes and settings.
 3. Ship pre-packed scenes (RGB9E5 or BC6H-compressed atlases, plus `sorted_faces.bin`) so
    students download one small scene with no conversion; check the Replica licence for

@@ -10,6 +10,7 @@ z forward. T_world_camera maps camera coordinates to world coordinates.
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass
 
@@ -96,6 +97,44 @@ class _ReflectionTargets:
     groups: list  # mirror.wgsl bind group per mirror
 
 
+def _norm(s: object) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+
+def match_adapter(spec: str, infos: list[dict]) -> int:
+    """Index of the adapter that `spec` names, among adapter-info dicts.
+
+    `spec` is matched without regard to case or punctuation: first as a whole
+    adapter type ("discrete-gpu", "integrated-gpu", "cpu") or backend ("vulkan",
+    "metal", "d3d12", "opengl"), otherwise as part of the device name, type or
+    backend ("5090", "llvmpipe", "radv"). When several match, the first that is
+    not OpenGL wins: a GPU is often listed a second time as an OpenGL adapter,
+    which lacks features the renderer needs.
+    """
+    want = _norm(spec)
+    fields = [[_norm(i.get(k, "")) for k in ("adapter_type", "backend_type", "device")] for i in infos]
+    hits = [n for n, f in enumerate(fields) if want and want in f[:2]]
+    if not hits:
+        hits = [n for n, f in enumerate(fields) if want and any(want in x for x in f)]
+    if not hits:
+        listing = "\n".join(f"  {describe_adapter(i)}" for i in infos) or "  (none)"
+        raise ValueError(f"no GPU adapter matches {spec!r}. Available:\n{listing}")
+    hits.sort(key=lambda n: fields[n][1] == "opengl")  # stable: keeps the listed order otherwise
+    return hits[0]
+
+
+def describe_adapter(info: dict) -> str:
+    return f"{info.get('device', '?')} ({info.get('backend_type', '?')}, {info.get('adapter_type', '?')})"
+
+
+def select_adapter(spec: str | None):
+    """The adapter `spec` names (see match_adapter), or the high-performance default."""
+    if not spec:
+        return wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    adapters = wgpu.gpu.enumerate_adapters_sync()
+    return adapters[match_adapter(spec, [a.info for a in adapters])]
+
+
 class Renderer:
     # HDR tone mapping. Gamma and saturation are PTexMesh's HDR defaults. Exposure is
     # ReplicaViewer's 0.01 rather than PTexMesh's 0.025 (which ReplicaRenderer uses):
@@ -107,8 +146,11 @@ class Renderer:
 
     def __init__(self, scene_dir: str, camera: Camera, cull: str = "back",
                  atlas_format: str = "rgba16float", mirrors: bool = False,
-                 mirror_depth: str = "surface", verbose: bool = True):
-        """mirrors: draw the mirrors and glass of the scene's glass.sur (off by default:
+                 mirror_depth: str = "surface", verbose: bool = True,
+                 adapter: str | None = None):
+        """adapter: which GPU to use, e.g. "integrated-gpu", "cpu" (software) or part of
+        a device name (see match_adapter); by default the REPLICA_ADAPTER environment
+        variable, or else the high-performance adapter. mirrors: draw the mirrors and glass of the scene's glass.sur (off by default:
         the NICE-SLAM sequences were rendered without). mirror_depth: one of
         MIRROR_DEPTH_MODES, used when mirrors are drawn."""
         self.camera = camera
@@ -124,9 +166,8 @@ class Renderer:
         sur = os.path.join(scene_dir, "glass.sur")
         surfaces = load_mirrors(sur) if os.path.exists(sur) else []
 
-        self.adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
-        info = self.adapter.info
-        self._log(f"GPU: {info.get('device', '?')} ({info.get('backend_type', '?')})")
+        self.adapter = select_adapter(adapter or os.environ.get("REPLICA_ADAPTER"))
+        self._log(f"GPU: {describe_adapter(self.adapter.info)}")
         lim = self.adapter.limits
         self.device = self.adapter.request_device_sync(
             required_limits={
