@@ -13,6 +13,10 @@ pytest = ">=9.2.0,<10"
 [pypi-dependencies]
 # Prebuilt wheels (with wgpu-native) for every platform above: nothing to compile.
 wgpu = ">=0.33,<0.34"
+# Windows for the interactive viewer; the glfw wheels bundle the GLFW library.
+rendercanvas = ">=2,<3"
+glfw = ">=2.8"
 
 [tasks]
 render = "python render_sequence.py"
+view = "python viewer.py"

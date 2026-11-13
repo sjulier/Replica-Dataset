@@ -127,25 +127,33 @@ class Renderer:
             {"binding": 4, "visibility": wgpu.ShaderStage.FRAGMENT,
              "texture": {"sample_type": wgpu.TextureSampleType.unfilterable_float}},
         ])
-        self.pipeline = d.create_render_pipeline(
-            layout=d.create_pipeline_layout(bind_group_layouts=[self.frame_layout, self.mesh_layout]),
-            vertex={"module": module, "entry_point": "vs_main", "buffers": []},
-            # Replica quads are counter-clockwise in OpenGL's y-up window space. The
-            # projection flips y (WebGPU framebuffers are y-down), so they arrive clockwise.
-            primitive={"topology": wgpu.PrimitiveTopology.triangle_list,
-                       "front_face": wgpu.FrontFace.cw, "cull_mode": cull},
-            depth_stencil={"format": wgpu.TextureFormat.depth32float,
-                           "depth_write_enabled": True,
-                           "depth_compare": wgpu.CompareFunction.less},
-            multisample=None,
-            fragment={"module": module, "entry_point": "fs_main", "targets": [
-                {"format": wgpu.TextureFormat.rgba8unorm},
-                {"format": wgpu.TextureFormat.r32float},
-            ]},
-        )
+        self._module, self._cull, self._pipelines = module, cull, {}
+        self.pipeline = self.pipeline_for(wgpu.TextureFormat.rgba8unorm)
         self.frame_buf = d.create_buffer(size=144, usage=wgpu.BufferUsage.UNIFORM | wgpu.BufferUsage.COPY_DST)
         self.frame_group = d.create_bind_group(layout=self.frame_layout, entries=[
             {"binding": 0, "resource": {"buffer": self.frame_buf}}])
+
+    def pipeline_for(self, color_format: str) -> object:
+        """The render pipeline for a colour target format (e.g. a window's), built once."""
+        if color_format not in self._pipelines:
+            d, module = self.device, self._module
+            self._pipelines[color_format] = d.create_render_pipeline(
+                layout=d.create_pipeline_layout(bind_group_layouts=[self.frame_layout, self.mesh_layout]),
+                vertex={"module": module, "entry_point": "vs_main", "buffers": []},
+                # Replica quads are counter-clockwise in OpenGL's y-up window space. The
+                # projection flips y (WebGPU framebuffers are y-down), so they arrive clockwise.
+                primitive={"topology": wgpu.PrimitiveTopology.triangle_list,
+                           "front_face": wgpu.FrontFace.cw, "cull_mode": self._cull},
+                depth_stencil={"format": wgpu.TextureFormat.depth32float,
+                               "depth_write_enabled": True,
+                               "depth_compare": wgpu.CompareFunction.less},
+                multisample=None,
+                fragment={"module": module, "entry_point": "fs_main", "targets": [
+                    {"format": color_format},
+                    {"format": wgpu.TextureFormat.r32float},
+                ]},
+            )
+        return self._pipelines[color_format]
 
     def _upload(self, scene: Scene) -> tuple[list[_GpuSubMesh], int]:
         d = self.device
@@ -184,11 +192,11 @@ class Renderer:
 
     # ---- rendering ------------------------------------------------------------
 
-    def render(self, T_world_camera: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Render colour (H,W,3 uint8) and depth along the optical axis (H,W float32, metres; 0 = nothing)."""
-        c = self.camera
+    def draw(self, T_world_camera: np.ndarray, camera: Camera, color_tex, depth_tex, zbuffer_tex) -> None:
+        """Render into the given targets (all camera-sized): colour in any format with a
+        pipeline from pipeline_for(), r32float depth, depth32float z-buffer."""
         mv = np.linalg.inv(np.asarray(T_world_camera, dtype=np.float64))
-        mvp = c.projection() @ mv
+        mvp = camera.projection() @ mv
         frame = np.zeros(36, dtype=np.float32)
         frame[0:16] = mvp.T.reshape(-1)  # WGSL matrices are column-major
         frame[16:32] = mv.T.reshape(-1)
@@ -200,16 +208,16 @@ class Renderer:
         enc = d.create_command_encoder()
         rp = enc.begin_render_pass(
             color_attachments=[
-                {"view": self.color_tex.create_view(), "load_op": wgpu.LoadOp.clear,
+                {"view": color_tex.create_view(), "load_op": wgpu.LoadOp.clear,
                  "store_op": wgpu.StoreOp.store, "clear_value": (0, 0, 0, 1)},
-                {"view": self.depth_out.create_view(), "load_op": wgpu.LoadOp.clear,
+                {"view": depth_tex.create_view(), "load_op": wgpu.LoadOp.clear,
                  "store_op": wgpu.StoreOp.store, "clear_value": (0, 0, 0, 0)},
             ],
-            depth_stencil_attachment={"view": self.zbuffer.create_view(), "depth_clear_value": 1.0,
+            depth_stencil_attachment={"view": zbuffer_tex.create_view(), "depth_clear_value": 1.0,
                                       "depth_load_op": wgpu.LoadOp.clear,
                                       "depth_store_op": wgpu.StoreOp.discard},
         )
-        rp.set_pipeline(self.pipeline)
+        rp.set_pipeline(self.pipeline_for(color_tex.format))
         rp.set_bind_group(0, self.frame_group)
         for sm in self.submeshes:
             rp.set_bind_group(1, sm.bind_group)
@@ -217,6 +225,10 @@ class Renderer:
         rp.end()
         d.queue.submit([enc.finish()])
 
+    def render(self, T_world_camera: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Render colour (H,W,3 uint8) and depth along the optical axis (H,W float32, metres; 0 = nothing)."""
+        c, d = self.camera, self.device
+        self.draw(T_world_camera, c, self.color_tex, self.depth_out, self.zbuffer)
         size = (c.width, c.height, 1)
         rgba = np.frombuffer(d.queue.read_texture({"texture": self.color_tex}, {"bytes_per_row": c.width * 4}, size),
                              dtype=np.uint8).reshape(c.height, c.width, 4)

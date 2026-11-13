@@ -7,6 +7,7 @@ wgpu's prebuilt wheels (about 180 MB).
 
 ```bash
 cd wgpu-renderer
+pixi run view /path/to/replica_v1/room_0      # interactive window
 pixi run render /path/to/replica_v1/room_0 out/room0 --frames 100
 pixi run python -m pytest tests          # synthetic tests, no dataset needed
 REPLICA_SCENE=/path/to/replica_v1/room_0 pixi run python -m pytest tests   # plus real-data checks
@@ -26,6 +27,13 @@ rgb, depth = r.render(T_world_camera)  # (680,1200,3) uint8, (680,1200) float32 
 
 Poses are camera-to-world with the camera axes of ReplicaSDK and OpenCV (x right, y down,
 z forward).
+
+## Viewer
+
+`pixi run view <scene>` opens a window: drag with the left mouse button to look around,
+W/A/S/D to move, Q/E down/up, Shift to move faster, R to reset, Esc to quit. The title bar
+shows the frame rate (about 75 fps at 1200×680 on an Apple M1). It uses
+[rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
 ## Data needed per scene
 
