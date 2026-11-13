@@ -69,8 +69,11 @@ class _GpuSubMesh:
 
 
 class Renderer:
-    # HDR tone mapping defaults of PTexMesh
-    exposure = 0.025
+    # HDR tone mapping. Gamma and saturation are PTexMesh's HDR defaults. Exposure is
+    # ReplicaViewer's 0.01 rather than PTexMesh's 0.025 (which ReplicaRenderer uses):
+    # the NICE-SLAM Replica sequences that pyslam uses were rendered at 0.01 (PSNR
+    # 32.6 dB against them at 0.01, 11.2 dB at 0.025).
+    exposure = 0.01
     gamma = 1.6969
     saturation = 1.5
 

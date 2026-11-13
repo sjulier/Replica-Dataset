@@ -1,4 +1,4 @@
-"""Native Replica renderer on WebGPU (spike)."""
+"""Native Replica renderer on WebGPU."""
 
 from .renderer import Camera, Renderer
 

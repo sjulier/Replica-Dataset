@@ -58,3 +58,27 @@ def test_atlases_match_submeshes(scene):
 def test_adjacency_matches_cpp(scene):
     quads = scene.submeshes[0].quads[:30000]  # a slice keeps the pure-Python reference quick
     np.testing.assert_array_equal(compute_adjacency(quads), reference_adjacency(quads))
+
+
+# NICE-SLAM's room0 sequence was rendered from Replica's room_0 by the original
+# OpenGL renderer: a reference for pose convention, geometry and tone mapping.
+NICE_ROOM0 = os.environ.get("NICE_SLAM_ROOM0")  # .../Replica/room0 from NICE-SLAM's Replica.zip
+
+
+@pytest.mark.skipif(not NICE_ROOM0, reason="set NICE_SLAM_ROOM0 (with REPLICA_SCENE = room_0)")
+def test_matches_nice_slam_room0():
+    from PIL import Image
+
+    from replica_wgpu import Camera, Renderer
+
+    poses = np.loadtxt(os.path.join(NICE_ROOM0, "traj.txt")).reshape(-1, 4, 4)
+    r = Renderer(SCENE, Camera.replica_pyslam(), verbose=False)
+    rgb, depth = r.render(poses[0])
+    ref_rgb = np.asarray(Image.open(os.path.join(NICE_ROOM0, "results", "frame000000.jpg")).convert("RGB"))
+    ref_depth = np.asarray(Image.open(os.path.join(NICE_ROOM0, "results", "depth000000.png"))) / 6553.5
+
+    valid = (depth > 0) & (ref_depth > 0)
+    err = np.abs(depth[valid] - ref_depth[valid])
+    assert np.median(err) < 0.005 and np.mean(err < 0.01) > 0.95, "geometry or pose convention"
+    mse = np.mean((rgb.astype(float) - ref_rgb.astype(float)) ** 2)
+    assert 10 * np.log10(255**2 / mse) > 30, "tone mapping (exposure/gamma/saturation)"

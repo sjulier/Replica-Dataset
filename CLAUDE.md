@@ -74,11 +74,17 @@ git submodule update --init   # not --recursive: Pangolin's own submodules aren'
   `habitat/sorted_faces.bin` (from `additional_habitat_configs.zip`) records the real
   order; `wgpu-renderer` uses it, and the C++ code should too.
 
-## wgpu renderer (spike)
+## wgpu renderer
 
 `wgpu-renderer/` is a pixi project: a Python renderer on wgpu that runs natively on macOS
-(Metal), Windows (D3D12) and Linux (Vulkan) with nothing compiled. See its README for usage,
-results and limitations. Run its tests with `pixi run python -m pytest tests` from that folder.
+(Metal), Windows (D3D12) and Linux (Vulkan) with nothing compiled, plus an interactive viewer
+window. See its README for usage, validation, performance and limitations. Run its tests with
+`pixi run python -m pytest tests` from that folder.
+
+- Validated against NICE-SLAM's `room0` frames (rendered by the original renderer): depth
+  within 1.6 mm median, colour 32.6 dB PSNR. That comparison also showed NICE-SLAM's
+  `traj.txt` is camera-to-world in OpenCV axes, and that it was rendered at exposure 0.01
+  (ReplicaViewer's default), not ReplicaRenderer's 0.025. Keep the default at 0.01.
 The test data used during development was `room_0`, extracted to a `replica_v1/` folder next
 to the repo (outside git).
 

@@ -189,7 +189,7 @@ def load_scene(scene_dir: str) -> Scene:
 
         hdr = os.path.join(tex_dir, f"{i}-color-ptex.hdr")
         if not os.path.exists(hdr):
-            raise FileNotFoundError(f"{hdr} (only HDR atlases are supported in the spike)")
+            raise FileNotFoundError(f"{hdr} (only HDR atlases are supported)")
         is_hdr = True
         submeshes.append(
             SubMesh(

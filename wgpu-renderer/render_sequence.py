@@ -50,11 +50,14 @@ def main() -> None:
     ap.add_argument("--camera", choices=["pyslam", "sdk"], default="pyslam")
     ap.add_argument("--atlas", choices=["rgba16float", "rgb9e5"], default="rgba16float",
                     help="GPU texture format: rgb9e5 halves texture memory")
+    ap.add_argument("--exposure", type=float, default=Renderer.exposure,
+                    help="HDR exposure (default %(default)s, as the NICE-SLAM sequences)")
     ap.add_argument("--cull", choices=["back", "front", "none"], default="back")
     args = ap.parse_args()
 
     cam = Camera.replica_pyslam() if args.camera == "pyslam" else Camera.replica_sdk()
     r = Renderer(args.scene_dir, cam, cull=args.cull, atlas_format=args.atlas)
+    r.exposure = args.exposure
     poses = (np.loadtxt(args.traj).reshape(-1, 4, 4) if args.traj
              else spin_trajectory(args.scene_dir, args.frames))[: args.frames]
 

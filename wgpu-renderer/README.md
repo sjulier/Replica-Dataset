@@ -1,4 +1,4 @@
-# Replica renderer on WebGPU (spike)
+# Replica renderer on WebGPU
 
 A native renderer for the Replica scenes in Python on [wgpu](https://github.com/pygfx/wgpu-py)
 (WebGPU over Metal, Direct3D 12 or Vulkan). It replaces the OpenGL 4.3 `ReplicaRenderer`, which
@@ -11,6 +11,8 @@ pixi run view /path/to/replica_v1/room_0      # interactive window
 pixi run render /path/to/replica_v1/room_0 out/room0 --frames 100
 pixi run python -m pytest tests          # synthetic tests, no dataset needed
 REPLICA_SCENE=/path/to/replica_v1/room_0 pixi run python -m pytest tests   # plus real-data checks
+# plus a comparison with the original renderer's output (NICE-SLAM's Replica/room0 folder):
+REPLICA_SCENE=.../room_0 NICE_SLAM_ROOM0=.../Replica/room0 pixi run python -m pytest tests
 pixi run python benchmark.py /path/to/replica_v1/room_0
 ```
 
@@ -26,13 +28,14 @@ rgb, depth = r.render(T_world_camera)  # (680,1200,3) uint8, (680,1200) float32 
 ```
 
 Poses are camera-to-world with the camera axes of ReplicaSDK and OpenCV (x right, y down,
-z forward).
+z forward), the convention of NICE-SLAM's `traj.txt` (verified, see below).
 
 ## Viewer
 
 `pixi run view <scene>` opens a window: drag with the left mouse button to look around,
-W/A/S/D to move, Q/E down/up, Shift to move faster, R to reset, Esc to quit. The title bar
-shows the frame rate (about 75 fps at 1200×680 on an Apple M1). It uses
+W/A/S/D to move, Q/E down/up, Shift to move faster, +/- to change the exposure, R to reset,
+Esc to quit. The title bar shows the frame rate; it is capped at the display's refresh rate
+(vsync), so a 75 Hz monitor shows about 75 fps. It uses
 [rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
 ## Data needed per scene
@@ -52,8 +55,27 @@ unstable `std::sort`, which cannot be reproduced (see below).
 - **Colour and metric depth in one pass** (two render targets); the OpenGL version draws twice.
 - **HDR atlases** as `rgba16float` (wgpu has no RGB16F) or, with `--atlas rgb9e5`, as
   `rgb9e5ufloat` at half the memory.
+- **Tone mapping** as PTexMesh (exposure, saturation, gamma), with exposure **0.01**:
+  ReplicaViewer's default, and what the NICE-SLAM sequences were rendered with.
+  `ReplicaRenderer` uses PTexMesh's 0.025, which is much brighter (`--exposure 0.025`).
 
-## Results (room_0, Apple M1, Metal, 2026-11-13)
+## Validation against the original renderer
+
+NICE-SLAM's `Replica/room0` sequence (the one pyslam downloads) was rendered from `room_0` by
+the original OpenGL renderer. Rendering its poses (`traj.txt`, frames 0 and 500):
+
+| | |
+|---|---|
+| depth, median difference | 1.6 mm (1.8 mm); 98.6% (99.6%) of pixels within 1 cm |
+| depth with the poses read as OpenGL camera axes instead | over 1 m: so `traj.txt` is OpenCV axes |
+| colour at exposure 0.01 | PSNR 32.6 dB against the reference JPEGs, visually indistinguishable |
+| colour at exposure 0.025 | PSNR 11.2 dB, 48% of pixels saturated (reference: 2%) |
+
+The reference frames are not in the repository. `python fetch_reference.py <dest>` pulls single
+frames and `traj.txt` out of NICE-SLAM's 12 GB `Replica.zip` with HTTP range requests (about
+10 MB for two frames).
+
+## Performance (room_0, Apple M1, Metal, 2026-11-13)
 
 | | |
 |---|---|
@@ -69,20 +91,19 @@ unstable `std::sort`, which cannot be reproduced (see below).
 
 - Tested only on an Apple M1 (Metal). Linux (Vulkan, and Mesa's lavapipe without a GPU),
   Windows (D3D12) and WSL2 are untested. On WSLg, pyslam found wgpu's default surface path crashes
-  and uses software Vulkan for Rerun; this renderer is off-screen (no surface), which may avoid that.
-- Not yet compared pixel-by-pixel against the OpenGL `ReplicaRenderer`. The planned Docker image
-  is for producing those reference frames. Sub-pixel conventions (pixel centres, near/far) are the
-  main thing to check.
+  and uses software Vulkan for Rerun; off-screen rendering (no surface) may avoid that, but the
+  viewer window would not.
+- Validated against one scene (room_0) through NICE-SLAM's frames; other scenes, and the
+  remaining 1.6 mm median depth difference (pixel-centre convention or quantisation), not yet
+  investigated.
 - Mirrors and glass (`glass.sur`) are not rendered yet; the OpenGL renderer has a reflection pass.
 - Only HDR atlases (`*.hdr`), which is what Replica v1 ships.
-- The camera rotation convention of NICE-SLAM's `traj.txt` is unverified; positions, which
-  trajectory error uses, are unaffected.
 - Not yet run through pyslam itself.
 
 ## Next steps
 
 1. Run on Linux/Windows/WSL2 machines, ideally including a low-spec laptop.
-2. Docker image with the OpenGL renderer for reference frames; compare.
+2. Docker image with the OpenGL renderer, for reference frames on other scenes and settings.
 3. Ship pre-packed scenes (RGB9E5 or BC6H-compressed atlases, plus `sorted_faces.bin`) so
    students download one small scene with no conversion; check the Replica licence for
    redistribution first.

@@ -1,6 +1,6 @@
 [workspace]
 name = "replica-wgpu"
-description = "Native Replica renderer on WebGPU (spike)"
+description = "Native Replica renderer on WebGPU"
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"]
 
