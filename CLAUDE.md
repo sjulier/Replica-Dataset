@@ -129,20 +129,25 @@ to the repo (outside git).
 
 ## Roadmap
 
-1. ~~Toolchain modernisation (CMake 4, latest Pangolin/Eigen, portability fixes).~~
-   Done in PR #1.
-2. Renderer spike: a native renderer for every student platform. Leading candidate
-   is **wgpu-py** (WebGPU: Metal / D3D12 / Vulkan; prebuilt wheels for every target
-   including Linux and Windows on ARM, so students compile nothing; pyslam's Rerun
-   viewer already runs on the same wgpu stack). Alternative: VulkanSceneGraph (C++,
-   macOS via MoltenVK, would need native bundles). Neither Metal nor MoltenVK has
-   geometry shaders, so quads are split on the CPU at load time with a per-vertex
-   face id. Validate against the existing OpenGL renderer's output.
-3. Docker image (Ubuntu + Mesa llvmpipe, x86_64 + arm64), for development and
-   testing only: verifies Linux builds and produces reference images from the
-   OpenGL renderer.
-4. Output compatible with pyslam's Replica loader (configurable intrinsics and
-   resolution, `traj.txt`).
-5. Real-time mode: a Python API that student code (and pyslam) drives directly,
-   e.g. `render(pose) -> rgb, depth`.
-6. Packaging aligned with pyslam (pixi; native bundles only if native code remains).
+Done:
+
+- Toolchain modernisation: CMake 4, Pangolin 0.9.6, Eigen 5.0.1, portability fixes
+  (PR #1).
+- Native renderer and viewer on wgpu-py in `wgpu-renderer/` (PR #3): no geometry shader
+  (vertex pulling), validated against NICE-SLAM's `room0` frames, writes pyslam's
+  Replica layout, and has a Python API (`Renderer.render(pose) -> rgb, depth`) that the
+  real-time mode can build on.
+
+Next, roughly in order:
+
+1. **Mirrors and glass** (`glass.sur`): the OpenGL renderer's reflection pass, ported.
+2. **Cross-platform testing**: Linux (Vulkan, and lavapipe without a GPU), Windows
+   (D3D12), WSL2, and a low-spec laptop. The biggest open question for students.
+3. **Scene distribution for students**: per-scene downloads rather than the 34 GB
+   archive, with atlases pre-packed (RGB9E5 or BC6H) and `sorted_faces.bin` included.
+   Check the Replica licence for redistribution first.
+4. **pyslam integration**: the renderer as a live pyslam data source; pixi packaging and
+   a course branch, as in pyslam.
+5. **Docker, for development and testing only**, now lower priority: NICE-SLAM's frames
+   already provide reference output for the scenes it covers (room0-2, office0-4). Still
+   useful for OpenGL reference frames of the other scenes and for Linux CI.
