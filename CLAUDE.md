@@ -74,8 +74,10 @@ git submodule update --init   # not --recursive: Pangolin's own submodules aren'
   submodule, rebuild on macOS and Linux, and commit the submodule pointer.
 - `ReplicaRenderer` (EGL/X11) is Linux-only (`REPLICA_BUILD_RENDERER`, default ON on
   Linux). `ptex` and `ReplicaViewer` are platform-neutral at build level.
-- There are no automated tests. Minimum verification is a clean `./build.sh` on macOS
-  arm64 plus Linux (x86_64 and arm64).
+- There are no automated tests for the C++. Minimum verification is a clean `./build.sh`
+  on macOS arm64 plus Linux (x86_64 and arm64). Linux x86_64 verified 2026-11-13: Ubuntu
+  26.04, gcc 15.2, CMake 4.2.3, no warnings; `ReplicaRenderer` runs on an NVIDIA card
+  through EGL. Linux arm64 is still unverified.
 
 ## Platform constraints (learned the hard way)
 
@@ -119,10 +121,38 @@ window. See its README for usage, validation, performance and limitations. Run i
   (ReplicaViewer's default), not ReplicaRenderer's 0.025. Keep the default at 0.01.
 - Mirrors and glass (`glass.sur`) are **off by default**: NICE-SLAM's frames were rendered
   without them. Depth inside mirrors has three modes (`surface`, the ReplicaRenderer default;
-  `sensor`, the reflected scene; `invalid`, 0); glass keeps its surface depth. No pixel
-  reference exists for mirrors yet (would need the OpenGL renderer).
+  `sensor`, the reflected scene; `invalid`, 0); glass keeps its surface depth.
+- Mirrors are checked against `ReplicaRenderer` on Linux (PR #9, which gives it an optional
+  pose file): at six NICE-SLAM room0 poses the reflections agree in content, position and
+  brightness; PSNR is 21 to 24 dB inside the mirror against 31 to 33 dB over the image.
+  That gap does not look mirror-specific: the same pixels score about as low with mirrors
+  off in both renderers, and so does the band just outside the mirror (a dark frame on a
+  saturated wall, compared against JPEGs). Settling it would need lossless output from
+  `ReplicaRenderer`. The original draws reflections double-sided; PR #10 does the same,
+  which is right for the roughly 200 pixels per frame it changes. Comparisons with
+  `ReplicaRenderer` must use its exposure, 0.025, so those
+  images look very bright; that is not a bug.
+- Tested on macOS (M1, Metal) and one Linux desktop (Ubuntu 26.04, Vulkan), where every test
+  passes on an NVIDIA RTX 5090, an AMD integrated GPU (RADV) and llvmpipe. `--adapter` /
+  `REPLICA_ADAPTER` (PR #8) choose the GPU. room_0 at 1200x680: 3.4 ms, 15.3 ms and 108 ms
+  per frame; llvmpipe needs 4.3 GB of memory (2.5 GB with `--atlas rgb9e5`) and was measured
+  on fast desktop cores, so it is a best case for a laptop.
+- The viewer window needs an adapter that can present to the screen: on the Linux desktop
+  `view --adapter integrated-gpu` aborts in wgpu with `Invalid surface` (off-screen rendering
+  on that adapter works). Not fixed, and not detectable beforehand through rendercanvas.
+- **Keep pixi versions in step.** The lock file was written by pixi 0.84.2. pixi 0.81.0 reads
+  it, but rewrites three `__unix=0` lines as `__unix=0=0` on any `pixi install` or `pixi run`
+  (no package changes), and `pixi run --locked` fails with "lock file not up-to-date with the
+  workspace". `--frozen` works and leaves the file alone. Do not commit that rewrite; update
+  pixi (`pixi self-update`) instead, and give students a minimum pixi version.
+- Some oddities are in the scans, not the renderer (README, "Known scan artefacts"): compare
+  with a NICE-SLAM frame before treating one as a bug.
+
 The test data used during development was `room_0`, extracted to a `replica_v1/` folder next
-to the repo (outside git).
+to the repo (outside git). `room_0` sits late in the release archive (after the three
+apartments), so extracting only it still means streaming most of the 34 GB. On the Linux
+desktop, NICE-SLAM reference frames are in `nice_slam_ref/` and the `ReplicaRenderer` frames
+for the mirror comparison in `replica_gl_reference/`, both next to the repo.
 
 ## Upstream PR status (as of 2026-11)
 
@@ -146,14 +176,17 @@ Done:
 
 Next, roughly in order:
 
-1. **Cross-platform testing**: Linux (Vulkan, and lavapipe without a GPU), Windows
-   (D3D12), WSL2, and a low-spec laptop. The biggest open question for students.
+1. **Cross-platform testing**, the biggest open question for students. Linux with Vulkan is
+   done (discrete, integrated and software). Still open: native Windows (D3D12), WSL2
+   (pyslam found wgpu's default surface path crashes on WSLg, so the viewer is the risk;
+   off-screen may be fine), a real low-spec laptop, and Linux arm64.
 2. **Scene distribution for students**: per-scene downloads rather than the 34 GB
    archive, with atlases pre-packed (RGB9E5 or BC6H) and `sorted_faces.bin` included.
    Check the Replica licence for redistribution first.
 3. **pyslam integration**: the renderer as a live pyslam data source; pixi packaging and
    a course branch, as in pyslam.
 4. **Docker, for development and testing only**, now lower priority: NICE-SLAM's frames
-   already provide reference output for the scenes it covers (room0-2, office0-4). Still
-   useful for OpenGL reference frames of the other scenes, a pixel reference for mirrors,
-   and Linux CI.
+   already provide reference output for the scenes it covers (room0-2, office0-4), and the
+   Linux desktop builds and runs `ReplicaRenderer` natively (which gave the mirror
+   reference). Still useful for Linux CI and for OpenGL reference frames on machines
+   without Linux.
