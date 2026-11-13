@@ -130,7 +130,7 @@ window. See its README for usage, validation, performance and limitations. Run i
   saturated wall, compared against JPEGs). Settling it would need lossless output from
   `ReplicaRenderer`. The original draws reflections double-sided; PR #10 does the same,
   which is right for the roughly 200 pixels per frame it changes. Comparisons with
-`ReplicaRenderer` must use its exposure, 0.025, so those
+  `ReplicaRenderer` must use its exposure, 0.025, so those
   images look very bright; that is not a bug.
 - Tested on macOS (M1, Metal) and one Linux desktop (Ubuntu 26.04, Vulkan), where every test
   passes on an NVIDIA RTX 5090, an AMD integrated GPU (RADV) and llvmpipe. `--adapter` /
