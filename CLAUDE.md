@@ -124,11 +124,13 @@ window. See its README for usage, validation, performance and limitations. Run i
   `sensor`, the reflected scene; `invalid`, 0); glass keeps its surface depth.
 - Mirrors are checked against `ReplicaRenderer` on Linux (PR #9, which gives it an optional
   pose file): at six NICE-SLAM room0 poses the reflections agree in content, position and
-  brightness; PSNR is 21 to 24 dB inside the mirror against 31 to 33 dB over the image. The
-  cause of that residual (surface outlines, edges of reflected objects) is not found. The
-  original draws reflections double-sided; branch `renderer/reflection-no-cull` does the
-  same, which is right for the roughly 200 pixels per frame it changes but is not the
-  residual. Comparisons with `ReplicaRenderer` must use its exposure, 0.025, so those
+  brightness; PSNR is 21 to 24 dB inside the mirror against 31 to 33 dB over the image.
+  That gap does not look mirror-specific: the same pixels score about as low with mirrors
+  off in both renderers, and so does the band just outside the mirror (a dark frame on a
+  saturated wall, compared against JPEGs). Settling it would need lossless output from
+  `ReplicaRenderer`. The original draws reflections double-sided; PR #10 does the same,
+  which is right for the roughly 200 pixels per frame it changes. Comparisons with
+`ReplicaRenderer` must use its exposure, 0.025, so those
   images look very bright; that is not a bug.
 - Tested on macOS (M1, Metal) and one Linux desktop (Ubuntu 26.04, Vulkan), where every test
   passes on an NVIDIA RTX 5090, an AMD integrated GPU (RADV) and llvmpipe. `--adapter` /
