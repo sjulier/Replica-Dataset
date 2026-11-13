@@ -104,6 +104,23 @@ The reference frames are not in the repository. `python fetch_reference.py <dest
 frames and `traj.txt` out of NICE-SLAM's 12 GB `Replica.zip` with HTTP range requests (about
 10 MB for two frames).
 
+## Known scan artefacts (not renderer bugs)
+
+Some oddities are in the Replica scans themselves: the original OpenGL renderer draws them
+too. Before reporting a rendering bug, compare with a NICE-SLAM frame of the same place
+(`fetch_reference.py`, then render that frame's pose from `traj.txt`).
+
+In `room_0`, in the corner to the right of the sideboard (NICE-SLAM `room0` frame 80 shows
+all three, identically to this renderer):
+
+- two spoked, wheel-like marks on the carpet;
+- a faint spoked dome shape on the wall above the skirting board;
+- small fragments floating above the vase on the sideboard.
+
+The likely cause is objects too thin to reconstruct (something made of wire in the corner,
+twigs in the vase): their appearance ended up in the textures of the surfaces behind them,
+and the twigs left only a few stray pieces of mesh.
+
 ## Performance (room_0, Apple M1, Metal, 2026-11-13)
 
 | | |
