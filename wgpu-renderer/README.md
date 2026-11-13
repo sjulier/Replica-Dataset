@@ -32,11 +32,11 @@ z forward), the convention of NICE-SLAM's `traj.txt` (verified, see below).
 
 ## Viewer
 
-`pixi run view <scene>` opens a window: drag with the left mouse button to look around,
-W/A/S/D to move, Q/E down/up, Shift to move faster, +/- to change the exposure, M to toggle
-mirrors and glass (on in the viewer), R to reset, Esc to quit. The title bar shows the frame rate; it is capped at the display's refresh rate
-(vsync), so a 75 Hz monitor shows about 75 fps. It uses
-[rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
+`pixi run view <scene>` opens a window: drag with the left mouse button or use the arrow keys
+to look around, W/A/S/D to move, Q/E down/up, Shift to move or turn faster, +/- to change the
+exposure, M to toggle mirrors and glass (on in the viewer), R to reset, Esc to quit. The title
+bar shows the frame rate; it is capped at the display's refresh rate (vsync), so a 75 Hz
+monitor shows about 75 fps. It uses [rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
 ## Data needed per scene
 
