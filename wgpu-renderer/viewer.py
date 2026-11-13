@@ -30,12 +30,13 @@ TURN_SPEED = 1.2  # radians per second with the arrow keys (x2 with Shift)
 
 class Viewer:
     def __init__(self, scene_dir: str, size: tuple[int, int], vfov_deg: float, atlas: str,
-                 exposure: float, max_seconds: float | None):
+                 exposure: float, max_seconds: float | None, adapter: str | None = None):
         self.vfov = math.radians(vfov_deg)
         w, h = size
         # The Renderer's own camera is only for its off-screen render(); the window
         # gets a camera matching its current size in draw().
-        self.r = Renderer(scene_dir, self._camera(w, h), atlas_format=atlas, mirrors=True)
+        self.r = Renderer(scene_dir, self._camera(w, h), atlas_format=atlas, mirrors=True,
+                          adapter=adapter)
         self.r.exposure = exposure
 
         pos, _ = read_ply(os.path.join(scene_dir, "mesh.ply"))
@@ -161,8 +162,10 @@ def main() -> None:
     ap.add_argument("--atlas", choices=["rgba16float", "rgb9e5"], default="rgba16float")
     ap.add_argument("--exposure", type=float, default=Renderer.exposure)
     ap.add_argument("--seconds", type=float, help="close after this many seconds (for testing)")
+    ap.add_argument("--adapter", help="GPU to use: discrete-gpu, integrated-gpu, cpu (software), a backend, "
+                                      "or part of a device name (default: $REPLICA_ADAPTER, else the fastest)")
     args = ap.parse_args()
-    Viewer(args.scene_dir, tuple(args.size), args.vfov, args.atlas, args.exposure, args.seconds)
+    Viewer(args.scene_dir, tuple(args.size), args.vfov, args.atlas, args.exposure, args.seconds, args.adapter)
     loop.run()
 
 
