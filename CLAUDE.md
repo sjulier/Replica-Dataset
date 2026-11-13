@@ -141,17 +141,19 @@ Done:
   (vertex pulling), validated against NICE-SLAM's `room0` frames, writes pyslam's
   Replica layout, and has a Python API (`Renderer.render(pose) -> rgb, depth`) that the
   real-time mode can build on.
+- Mirrors and glass from `glass.sur` (PR #5), off by default, with three depth modes for
+  mirrors (`surface`, `sensor`, `invalid`).
 
 Next, roughly in order:
 
-1. **Mirrors and glass** (`glass.sur`): the OpenGL renderer's reflection pass, ported.
-2. **Cross-platform testing**: Linux (Vulkan, and lavapipe without a GPU), Windows
+1. **Cross-platform testing**: Linux (Vulkan, and lavapipe without a GPU), Windows
    (D3D12), WSL2, and a low-spec laptop. The biggest open question for students.
-3. **Scene distribution for students**: per-scene downloads rather than the 34 GB
+2. **Scene distribution for students**: per-scene downloads rather than the 34 GB
    archive, with atlases pre-packed (RGB9E5 or BC6H) and `sorted_faces.bin` included.
    Check the Replica licence for redistribution first.
-4. **pyslam integration**: the renderer as a live pyslam data source; pixi packaging and
+3. **pyslam integration**: the renderer as a live pyslam data source; pixi packaging and
    a course branch, as in pyslam.
-5. **Docker, for development and testing only**, now lower priority: NICE-SLAM's frames
+4. **Docker, for development and testing only**, now lower priority: NICE-SLAM's frames
    already provide reference output for the scenes it covers (room0-2, office0-4). Still
-   useful for OpenGL reference frames of the other scenes and for Linux CI.
+   useful for OpenGL reference frames of the other scenes, a pixel reference for mirrors,
+   and Linux CI.

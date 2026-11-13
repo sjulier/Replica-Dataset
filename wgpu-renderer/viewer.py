@@ -2,7 +2,7 @@
 
     python viewer.py <replica_v1>/room_0
 
-Controls: drag with the left mouse button to look around; W/A/S/D move,
+Controls: drag with the left mouse button, or use the arrow keys, to look around; W/A/S/D move,
 Q/E down/up, hold Shift to move faster; +/- change the exposure;
 M toggles mirrors and glass;
 R resets the view; Esc quits.
@@ -25,6 +25,7 @@ from replica_wgpu.scene import read_ply
 
 LOOK_SPEED = 0.005  # radians per pixel dragged
 MOVE_SPEED = 1.0  # metres per second (x4 with Shift)
+TURN_SPEED = 1.2  # radians per second with the arrow keys (x2 with Shift)
 
 
 class Viewer:
@@ -116,6 +117,10 @@ class Viewer:
         for key, d in (("w", flat), ("s", -flat), ("d", right), ("a", -right), ("e", up), ("q", -up)):
             if key in self.keys:
                 self.pos += speed * d
+        turn = TURN_SPEED * (2 if "shift" in self.keys else 1) * dt
+        k = self.keys
+        self.yaw += turn * (("arrowleft" in k) - ("arrowright" in k))
+        self.pitch = max(-1.5, min(1.5, self.pitch + turn * (("arrowup" in k) - ("arrowdown" in k))))
 
     # ---- drawing --------------------------------------------------------------
 
