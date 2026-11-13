@@ -67,6 +67,20 @@ git submodule update --init   # not --recursive: Pangolin's own submodules aren'
   so Replica links `GLEW::GLEW` itself.
 - EGL context selection (`ReplicaSDK/ptex/EGL.cpp`): NVIDIA CUDA device, then an X
   display if one opens, then the first EGL device (Mesa GPU or llvmpipe).
+- **Atlas tiles depend on an unstable sort.** Tile *i* of atlas *k* is face *i* of
+  sub-mesh *k* in the order `PTexMesh::SplitMesh`'s `std::sort` left it when the atlases
+  were made (with gcc). Faces with equal Morton codes can come out in another order with
+  another standard library (e.g. libc++ on macOS), putting textures on the wrong faces.
+  `habitat/sorted_faces.bin` (from `additional_habitat_configs.zip`) records the real
+  order; `wgpu-renderer` uses it, and the C++ code should too.
+
+## wgpu renderer (spike)
+
+`wgpu-renderer/` is a pixi project: a Python renderer on wgpu that runs natively on macOS
+(Metal), Windows (D3D12) and Linux (Vulkan) with nothing compiled. See its README for usage,
+results and limitations. Run its tests with `pixi run python -m pytest tests` from that folder.
+The test data used during development was `room_0`, extracted to a `replica_v1/` folder next
+to the repo (outside git).
 
 ## Upstream PR status (as of 2026-11)
 
