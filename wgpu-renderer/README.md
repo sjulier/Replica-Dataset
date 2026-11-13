@@ -102,8 +102,25 @@ Mirror3D (Tan et al., CVPR 2021), which found raw depth at mirrors missing or wr
 ScanNet and Matterport3D, and Whelan et al. (SIGGRAPH 2018), where Replica's surfaces come from.
 
 Checked on a synthetic mirror (tests) and on room_0: `sensor` depth reflected back about the
-mirror lands on real geometry inside the room. There is no pixel reference: ReplicaRenderer's
-own output with mirrors would need the OpenGL renderer (the Docker image). Like the original,
+mirror lands on real geometry inside the room.
+
+Compared with `ReplicaRenderer` itself (OpenGL, Linux, RTX 5090) at six of NICE-SLAM's room0
+poses that see the mirror or the glass (frames 0, 80, 160, 240, 465, 608), both at 1280×960,
+exposure 0.025 and against its JPEGs:
+
+| | |
+|---|---|
+| whole image, mirrors on | PSNR 30.9 to 32.7 dB (mirrors off: 30.9 to 32.3 dB) |
+| inside the mirror and glass (1.0 to 2.4% of pixels) | 20.9 to 23.9 dB with the mirror in view, 28.8 dB for the glass alone |
+| the same pixels against `ReplicaRenderer` without mirrors | 10.9 to 16.0 dB |
+| depth (`surface`), median difference | 0.35 to 2.3 mm; 96.0 to 99.6% of pixels within 1 cm |
+
+The reflections agree in content, position and brightness (mean difference at most 1.2 of
+255); nothing is flipped or offset. What remains is at the edges of the surfaces and of the
+objects reflected in them. `ReplicaRenderer`'s depth is identical with and
+without mirrors, which is what `surface` models.
+
+Like the original,
 a surface's polygon covers its whole outline, so the grid frame of room_0's mirror is drawn
 as mirror too. Cost on an M1: about +1 ms per frame close to a mirror and +3 ms with both of
 room_0's surfaces in view (each reflection pass is scissored to the surface's screen area).

@@ -142,8 +142,15 @@ with an X server (desktop Linux, WSLg) it renders through that, and otherwise
 it uses the first EGL device (e.g. Mesa's llvmpipe).
 
 ```bash
-./build/bin/ReplicaRenderer mesh.ply textures glass.sur
+./build/bin/ReplicaRenderer mesh.ply textures [glass.sur [poses.txt]]
 ```
+
+It writes `frame%06d.jpg` and `depth%06d.png` (1280x960, depth in metres x 6553.5)
+into the current directory. Without a pose file it renders 100 frames along a
+built-in path looking down on the scene. With one it renders a frame per line:
+each line is a camera-to-world 4x4 matrix as 16 numbers in row-major order, with
+the camera's x right, y down and z forward (the format of NICE-SLAM's
+`traj.txt`). To give poses without mirrors, pass `""` in place of `glass.sur`.
 
 ## Replica and AI Habitat
 

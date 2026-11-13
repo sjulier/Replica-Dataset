@@ -3,12 +3,46 @@
 #include <PTexLib.h>
 #include <pangolin/image/image_convert.h>
 
+#include <fstream>
+#include <sstream>
+
 #include "GLCheck.h"
 #include "MirrorRenderer.h"
 
+// Read camera poses in the format of NICE-SLAM's traj.txt: one camera-to-world
+// 4x4 matrix per line, as 16 numbers in row-major order, with the camera axes
+// of this renderer and OpenCV (x right, y down, z forward).
+static std::vector<Eigen::Matrix4d> LoadPoses(const std::string& poseFile) {
+  std::vector<Eigen::Matrix4d> poses;
+  std::ifstream file(poseFile);
+  std::string line;
+  while (std::getline(file, line)) {
+    std::istringstream values(line);
+    Eigen::Matrix4d T_world_camera;
+    bool ok = true;
+    for (int r = 0; r < 4 && ok; r++) {
+      for (int c = 0; c < 4 && ok; c++) {
+        ok = static_cast<bool>(values >> T_world_camera(r, c));
+      }
+    }
+    if (ok) {
+      poses.push_back(T_world_camera);
+    } else {
+      // blank lines are fine; anything else is a malformed pose
+      ASSERT(line.find_first_not_of(" \t\r") == std::string::npos,
+             "Expected 16 numbers per line in " + poseFile);
+    }
+  }
+  return poses;
+}
+
 
 int main(int argc, char* argv[]) {
-  ASSERT(argc == 3 || argc == 4, "Usage: ./ReplicaRenderer mesh.ply /path/to/atlases [mirrorFile]");
+  ASSERT(argc >= 3 && argc <= 5,
+         "Usage: ./ReplicaRenderer mesh.ply /path/to/atlases [mirrorFile [poseFile]]\n"
+         "  mirrorFile  glass.sur; pass \"\" for none when giving a poseFile\n"
+         "  poseFile    camera-to-world poses, 16 numbers per line (NICE-SLAM traj.txt);\n"
+         "              one frame is rendered per pose instead of the built-in trajectory");
 
   const std::string meshFile(argv[1]);
   const std::string atlasFolder(argv[2]);
@@ -16,9 +50,18 @@ int main(int argc, char* argv[]) {
   ASSERT(pangolin::FileExists(atlasFolder));
 
   std::string surfaceFile;
-  if (argc == 4) {
+  if (argc >= 4 && argv[3][0] != '\0') {
     surfaceFile = std::string(argv[3]);
     ASSERT(pangolin::FileExists(surfaceFile));
+  }
+
+  std::vector<Eigen::Matrix4d> poses;
+  if (argc == 5) {
+    const std::string poseFile(argv[4]);
+    ASSERT(pangolin::FileExists(poseFile));
+    poses = LoadPoses(poseFile);
+    ASSERT(!poses.empty(), "No poses in " + poseFile);
+    std::cout << "Loaded " << poses.size() << " poses" << std::endl;
   }
 
   const int width = 1280;
@@ -92,8 +135,13 @@ int main(int argc, char* argv[]) {
   pangolin::ManagedImage<uint16_t> depthImageInt(width, height);
 
   // Render some frames
-  const size_t numFrames = 100;
+  const size_t numFrames = poses.empty() ? 100 : poses.size();
   for (size_t i = 0; i < numFrames; i++) {
+    if (!poses.empty()) {
+      T_camera_world = poses[i].inverse();
+      s_cam.GetModelViewMatrix() = T_camera_world;
+    }
+
     std::cout << "\rRendering frame " << i + 1 << "/" << numFrames << "... ";
     std::cout.flush();
 
@@ -168,10 +216,12 @@ int main(int argc, char* argv[]) {
           std::string(filename), true, 34.0f);
     }
 
-    // Move the camera
-    T_camera_world = T_camera_world * T_new_old.inverse();
+    if (poses.empty()) {
+      // Move the camera
+      T_camera_world = T_camera_world * T_new_old.inverse();
 
-    s_cam.GetModelViewMatrix() = T_camera_world;
+      s_cam.GetModelViewMatrix() = T_camera_world;
+    }
   }
   std::cout << "\rRendering frame " << numFrames << "/" << numFrames << "... done" << std::endl;
 
