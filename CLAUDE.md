@@ -14,6 +14,24 @@ Linux use the Replica SDK to
 Every change should be judged by whether it works across all of those platforms.
 Upstream is effectively unmaintained, so fixes land here rather than waiting on it.
 
+Design principles:
+
+- **Native and small for students.** Many students have resource-constrained
+  machines, so what they run must work natively, without Docker or a VM, and must be
+  small. **Docker is for development and testing only** (Linux verification, CI,
+  reference images), never the student route.
+- **Students build as little as possible.** Follow the companion project
+  [sjulier/pyslam](https://github.com/sjulier/pyslam): pixi environments from a lock
+  file, with any native C++ shipped as prebuilt per-platform bundles (GitHub release
+  assets, falling back to a source build). See pyslam's `docs/TEACHING_SETUP.md` and
+  `scripts/native_bundle.py`.
+- **Interoperate with pyslam.** pyslam's `ReplicaDataset` (`pyslam/io/dataset.py`)
+  reads the NICE-SLAM layout: `<scene>/results/frame%06d.jpg`,
+  `<scene>/results/depth%06d.png` (16-bit, scale 6553.5) and `<scene>/traj.txt`, with
+  the camera in pyslam's `settings/REPLICA.yaml` (1200x680, fx=fy=600). Output from
+  this repo should drop into that loader without conversion, and the real-time mode
+  should eventually be usable as a pyslam data source.
+
 ## Git workflow
 
 - The fork is `sjulier/Replica-Dataset`; `main` is its default branch.
@@ -26,7 +44,20 @@ Upstream is effectively unmaintained, so fixes land here rather than waiting on 
   `gh repo set-default sjulier/Replica-Dataset`
   and/or pass `-R sjulier/Replica-Dataset --base main` explicitly.
 - Keep upstream authorship when pulling in upstream PRs (merge or cherry-pick their
-  commits rather than re-typing them).
+  commits rather than re-typing them). Merge PRs with a merge commit, not a squash,
+  for the same reason; delete the branch after merging.
+
+### Release model (same as pyslam)
+
+- `main` is development.
+- Each course run gets a long-lived branch named after it, matching pyslam
+  (e.g. `comp0227-2026`). It is what students clone, and it **only receives bug
+  fixes**, cherry-picked or merged from `main` by PR. Create it when there is first
+  something to ship to students.
+- Tag the course branch whenever something ships, e.g. `comp0227-2026-lab03`, so a
+  lab's instructions can pin an exact version.
+- Prebuilt native bundles, if any, are release assets on a dedicated tag (pyslam
+  uses `native-bundles`).
 
 ## Building
 
@@ -50,8 +81,9 @@ git submodule update --init   # not --recursive: Pangolin's own submodules aren'
 
 - **OpenGL 4.3 is required** (`#version 430` shaders, shader storage buffers, plus
   legacy calls such as `glPushAttrib`/`glBegin` needing a compatibility context).
-  macOS's OpenGL tops out at 4.1, so nothing can render natively on a Mac: Mac
-  students need a Linux VM/container (Mesa llvmpipe) until the renderer is ported.
+  macOS's OpenGL tops out at 4.1, so the current renderer cannot run natively on a
+  Mac at all. This is the main reason for the renderer port (roadmap item 2); a
+  Linux container is a developer workaround, not a student route.
 - **No x86-only flags** (`-msse*`, etc.): Apple Silicon and ARM Linux VMs/containers
   are first-class targets.
 - **Case-insensitive file systems** (macOS, Windows, WSL2 under `/mnt/c`): headers on
@@ -77,9 +109,20 @@ git submodule update --init   # not --recursive: Pangolin's own submodules aren'
 
 ## Roadmap
 
-1. Toolchain modernisation (CMake 4, latest Pangolin/Eigen, portability fixes).
-2. Docker image (Ubuntu + Mesa llvmpipe, x86_64 + arm64) as the common environment
-   for headless rendering on every platform.
-3. Real-time mode: renderer as a server that student code drives over a socket.
-4. Investigate porting the renderer off legacy OpenGL (e.g. VulkanSceneGraph, which
-   would reach macOS via MoltenVK).
+1. ~~Toolchain modernisation (CMake 4, latest Pangolin/Eigen, portability fixes).~~
+   Done in PR #1.
+2. Renderer spike: a native renderer for every student platform. Leading candidate
+   is **wgpu-py** (WebGPU: Metal / D3D12 / Vulkan; prebuilt wheels for every target
+   including Linux and Windows on ARM, so students compile nothing; pyslam's Rerun
+   viewer already runs on the same wgpu stack). Alternative: VulkanSceneGraph (C++,
+   macOS via MoltenVK, would need native bundles). Neither Metal nor MoltenVK has
+   geometry shaders, so quads are split on the CPU at load time with a per-vertex
+   face id. Validate against the existing OpenGL renderer's output.
+3. Docker image (Ubuntu + Mesa llvmpipe, x86_64 + arm64), for development and
+   testing only: verifies Linux builds and produces reference images from the
+   OpenGL renderer.
+4. Output compatible with pyslam's Replica loader (configurable intrinsics and
+   resolution, `traj.txt`).
+5. Real-time mode: a Python API that student code (and pyslam) drives directly,
+   e.g. `render(pose) -> rgb, depth`.
+6. Packaging aligned with pyslam (pixi; native bundles only if native code remains).
