@@ -137,6 +137,12 @@ window. See its README for usage, validation, performance and limitations. Run i
   `REPLICA_ADAPTER` (PR #8) choose the GPU. room_0 at 1200x680: 3.4 ms, 15.3 ms and 108 ms
   per frame; llvmpipe needs 4.3 GB of memory (2.5 GB with `--atlas rgb9e5`) and was measured
   on fast desktop cores, so it is a best case for a laptop.
+- Windows laptop (i7-13850HX, RTX 2000 Ada + Intel integrated, 2026-11-14): all 29 tests pass
+  natively and under WSL2; the viewer opens on both. Native Windows picks the NVIDIA GPU on
+  Vulkan by default (8.3 ms per frame); the Intel GPU manages 17 to 23 ms; Microsoft's software
+  adapter 368 ms. **Under WSL2 wgpu sees only llvmpipe** (222 ms per frame, 4.3 GB, or 2.4 GB
+  with `rgb9e5`), so WSL2 students render in software: fine for pre-rendering, too slow for
+  an interactive loop. This matters for the choice between WSL2 and native Windows.
 - The viewer window needs an adapter that can present to the screen: on the Linux desktop
   `view --adapter integrated-gpu` aborts in wgpu with `Invalid surface` (off-screen rendering
   on that adapter works). Not fixed, and not detectable beforehand through rendercanvas.
@@ -177,9 +183,9 @@ Done:
 Next, roughly in order:
 
 1. **Cross-platform testing**, the biggest open question for students. Linux with Vulkan is
-   done (discrete, integrated and software). Still open: native Windows (D3D12), WSL2
-   (pyslam found wgpu's default surface path crashes on WSLg, so the viewer is the risk;
-   off-screen may be fine), a real low-spec laptop, and Linux arm64.
+   done (discrete, integrated and software), and so are native Windows and WSL2 on one
+   laptop. Still open: a real low-spec laptop, Linux arm64, and whether a GPU can be made
+   visible to wgpu under WSL2 (today it is software only there).
 2. **Scene distribution for students**: per-scene downloads rather than the 34 GB
    archive, with atlases pre-packed (RGB9E5 or BC6H) and `sorted_faces.bin` included.
    Check the Replica licence for redistribution first.

@@ -23,6 +23,28 @@ def test_match(spec, index):
     assert match_adapter(spec, ADAPTERS) == index
 
 
+# A Windows laptop with two GPUs, as wgpu listed them (Intel first on each backend).
+LAPTOP = [
+    {"device": "Intel(R) RaptorLake-S Mobile Graphics Controller", "backend_type": "Vulkan",
+     "adapter_type": "IntegratedGPU"},
+    {"device": "NVIDIA RTX 2000 Ada Generation Laptop GPU", "backend_type": "Vulkan", "adapter_type": "DiscreteGPU"},
+    {"device": "Intel(R) UHD Graphics", "backend_type": "D3D12", "adapter_type": "IntegratedGPU"},
+    {"device": "NVIDIA RTX 2000 Ada Generation Laptop GPU", "backend_type": "D3D12", "adapter_type": "DiscreteGPU"},
+    {"device": "Microsoft Basic Render Driver", "backend_type": "D3D12", "adapter_type": "CPU"},
+    {"device": "Intel(R) RaptorLake-S Mobile Graphics Controller", "backend_type": "OpenGL",
+     "adapter_type": "IntegratedGPU"},
+]
+
+
+@pytest.mark.parametrize("spec, index", [
+    ("d3d12", 3), ("vulkan", 1),          # a backend alone: its discrete GPU, not the first listed
+    ("integrated-gpu", 0), ("intel", 0),  # the Intel on Vulkan, not on OpenGL
+    ("2000", 1), ("cpu", 4), ("opengl", 5),
+])
+def test_discrete_preferred_among_matches(spec, index):
+    assert match_adapter(spec, LAPTOP) == index
+
+
 def test_vulkan_preferred_over_opengl():
     assert match_adapter("5090", ADAPTERS[::-1]) == 3  # the Vulkan one, though listed last
 

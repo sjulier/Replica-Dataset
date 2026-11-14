@@ -107,9 +107,10 @@ def match_adapter(spec: str, infos: list[dict]) -> int:
     `spec` is matched without regard to case or punctuation: first as a whole
     adapter type ("discrete-gpu", "integrated-gpu", "cpu") or backend ("vulkan",
     "metal", "d3d12", "opengl"), otherwise as part of the device name, type or
-    backend ("5090", "llvmpipe", "radv"). When several match, the first that is
-    not OpenGL wins: a GPU is often listed a second time as an OpenGL adapter,
-    which lacks features the renderer needs.
+    backend ("5090", "llvmpipe", "radv"). When several match, OpenGL adapters come
+    last (a GPU is often listed a second time as an OpenGL adapter, which lacks
+    features the renderer needs), then a discrete GPU is preferred to an integrated
+    one and that to anything else: "d3d12" on a laptop means its fast GPU on D3D12.
     """
     want = _norm(spec)
     fields = [[_norm(i.get(k, "")) for k in ("adapter_type", "backend_type", "device")] for i in infos]
@@ -119,7 +120,9 @@ def match_adapter(spec: str, infos: list[dict]) -> int:
     if not hits:
         listing = "\n".join(f"  {describe_adapter(i)}" for i in infos) or "  (none)"
         raise ValueError(f"no GPU adapter matches {spec!r}. Available:\n{listing}")
-    hits.sort(key=lambda n: fields[n][1] == "opengl")  # stable: keeps the listed order otherwise
+    speed = {"discretegpu": 0, "integratedgpu": 1}
+    # stable: keeps the listed order among equals
+    hits.sort(key=lambda n: (fields[n][1] == "opengl", speed.get(fields[n][0], 2)))
     return hits[0]
 
 
