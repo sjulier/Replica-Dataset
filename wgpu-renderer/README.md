@@ -58,9 +58,33 @@ exposure, M to toggle mirrors and glass (on in the viewer), R to reset, Esc to q
 bar shows the frame rate; it is capped at the display's refresh rate (vsync), so a 75 Hz
 monitor shows about 75 fps. It uses [rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
+## Object ids and annotations
+
+`Renderer.render_objects(T)` returns which annotated object each pixel shows, as an (H, W)
+int32 image of object ids (-1 where there is nothing), and `Renderer.objects()` the objects
+themselves: id, class name (`sofa`, `table`, `cushion`, ...) and an oriented box in the
+coordinates of `mesh.ply` (`center`, `sizes`, `rotation` with the box's axes as columns,
+`volume`). For room_0 that is 92 objects in 29 classes.
+
+```python
+ids = r.render_objects(T_world_camera)        # same camera and pose as r.render()
+objects = r.objects()
+print({objects[i].class_name for i in np.unique(ids) if i in objects})
+```
+
+The ids come from `habitat/mesh_semantic.ply`, which has the same vertices and faces as
+`mesh.ply` in the same order plus an object id per face; the boxes from
+`habitat/info_semantic.json`, whose box centres are stored in each box's own frame (checked on
+room_0: rotated into mesh coordinates they lie within 3 mm, median, of the centre of each
+object's faces, and 99.6% or more of each object's vertices fall inside its box). Both files
+come with `additional_habitat_configs.zip`. Nothing is loaded until the first
+`render_objects()`; the pass then costs about 1 ms per 1200x680 frame on an RTX 5090 and
+4 bytes of GPU memory per face. Mirrors are not drawn in it.
+
 ## Data needed per scene
 
-`mesh.ply`, `textures/` and **`habitat/sorted_faces.bin`**. The last is not in the main Replica
+`mesh.ply`, `textures/` and **`habitat/sorted_faces.bin`** (plus `habitat/mesh_semantic.ply` and
+`habitat/info_semantic.json` for object ids). The last is not in the main Replica
 archive but in `additional_habitat_configs.zip` (which `download.sh` also fetches). It is
 required: atlas tile *i* holds face *i* of its sub-mesh in the order produced by ReplicaSDK's
 unstable `std::sort`, which cannot be reproduced (see below).

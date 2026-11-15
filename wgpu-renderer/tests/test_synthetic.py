@@ -38,6 +38,7 @@ QUADS = np.array([
 QUADRANTS = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 0]], dtype=np.float32)
 MIRROR_X = 0.9
 MINUS_X_COLOUR = 0.2 * 1 / 6  # face 1's uniform tile
+FACE_OBJECT = np.array([7, 3, 5, 5, 9, 9], dtype=np.uint16)  # object id of each face
 
 
 def write_scene(path):
@@ -78,6 +79,30 @@ def write_scene(path):
     }
     with open(os.path.join(path, "glass.sur"), "w") as f:
         json.dump([mirror], f)
+
+    # Semantics as Replica's habitat/ files: face i belongs to object FACE_OBJECT[i].
+    os.makedirs(os.path.join(path, "habitat"))
+    header = (
+        "ply\nformat binary_little_endian 1.0\ncomment replica-instance-mesh-format v0\n"
+        f"element vertex {len(CORNERS)}\n" + "".join(f"property float {a}\n" for a in ("x", "y", "z", "nx", "ny", "nz"))
+        + "property uchar red\nproperty uchar green\nproperty uchar blue\n"
+        f"element face {len(QUADS)}\nproperty list uint8 uint32 vertex_indices\nproperty uint16 object_id\nend_header\n"
+    )
+    verts = np.zeros(len(CORNERS), dtype=[("p", "<f4", (3,)), ("n", "<f4", (3,)), ("c", "u1", (3,))])
+    verts["p"] = CORNERS
+    sem = np.zeros(len(QUADS), dtype=[("n", "u1"), ("v", "<u4", (4,)), ("o", "<u2")])
+    sem["n"], sem["v"], sem["o"] = 4, QUADS, FACE_OBJECT
+    with open(os.path.join(path, "habitat", "mesh_semantic.ply"), "wb") as f:
+        f.write(header.encode())
+        f.write(verts.tobytes())
+        f.write(sem.tobytes())
+    # One box, turned 90 degrees about z; its "center" is stored in its own frame.
+    c45 = float(np.sqrt(0.5))
+    box = {"id": 7, "class_name": "wall", "oriented_bbox": {
+        "abb": {"center": [0.0, -0.9, 0.0], "sizes": [2.0, 0.05, 2.0]},
+        "orientation": {"rotation": [0.0, 0.0, c45, c45], "translation": [0, 0, 0]}}}
+    with open(os.path.join(path, "habitat", "info_semantic.json"), "w") as f:
+        json.dump({"objects": [box]}, f)
 
 
 @pytest.fixture(scope="module")
@@ -168,3 +193,21 @@ def test_mirror_mask(tmp_path):
     assert m.mask().min() == 255  # the polygon fills its rectangle
     m.boundary_mani = m.boundary_mani[:3]  # a triangle: half of it
     assert abs(np.mean(m.mask() > 0) - 0.5) < 0.01
+
+
+def test_render_objects(renderer):
+    ids = renderer.render_objects(look_along_x())
+    assert ids.dtype == np.int32 and ids.shape == (64, 64)
+    assert (ids == 7).all()  # the +x wall fills the view
+    T = look_along_x()
+    T[:3, 0], T[:3, 2] = -T[:3, 0], -T[:3, 2]  # turn round: the -x wall
+    assert (renderer.render_objects(T) == 3).all()
+
+
+def test_objects_in_mesh_coordinates(renderer):
+    (box,) = renderer.objects().values()
+    assert box.id == 7 and box.class_name == "wall"
+    # (0, -0.9, 0) in the box frame, turned 90 degrees about z: (0.9, 0, 0), the +x wall
+    np.testing.assert_allclose(box.center, [0.9, 0.0, 0.0], atol=1e-6)
+    np.testing.assert_allclose(box.rotation @ [1.0, 0, 0], [0, 1.0, 0], atol=1e-6)
+    assert box.volume == pytest.approx(2.0 * 0.05 * 2.0)
