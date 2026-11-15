@@ -14,11 +14,44 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import sys
+import tempfile
 import time
 
+import glfw
 import numpy as np
 import wgpu
-from rendercanvas.glfw import RenderCanvas, loop
+
+
+def _choose_glfw_platform() -> None:
+    """Work around a crash when GLFW comes from conda-forge (as in pySLAM's environment).
+
+    On a Wayland session such a GLFW decorates its window with the system's libdecor, whose
+    GTK plugin fails to start inside a conda environment and takes the process down. By
+    default the window then stays on Wayland with libdecor's plugins switched off: it works
+    at full speed but, on desktops that leave decoration to the application (GNOME), it has
+    no title bar. REPLICA_GLFW_PLATFORM=x11 opens it through XWayland instead, with a title
+    bar; REPLICA_GLFW_PLATFORM=wayland leaves GLFW alone. The glfw wheel from PyPI (the
+    renderer's own environment) is not affected. Must run before rendercanvas starts GLFW.
+    """
+    if not sys.platform.startswith("linux") or not hasattr(glfw, "platform_supported"):
+        return
+    choice = os.environ.get("REPLICA_GLFW_PLATFORM", "auto").lower()
+    has_x11 = bool(glfw.platform_supported(glfw.PLATFORM_X11))
+    if choice == "x11":
+        if has_x11:
+            glfw.init_hint(glfw.PLATFORM, glfw.PLATFORM_X11)
+        return
+    # A library built for both X11 and Wayland, inside a conda environment: the case that crashes.
+    conda_glfw = has_x11 and os.path.isdir(os.path.join(sys.prefix, "conda-meta"))
+    if choice == "auto" and conda_glfw and os.environ.get("WAYLAND_DISPLAY"):
+        empty = os.path.join(tempfile.gettempdir(), "replica-viewer-no-libdecor-plugins")
+        os.makedirs(empty, exist_ok=True)
+        os.environ.setdefault("LIBDECOR_PLUGIN_DIR", empty)
+
+
+_choose_glfw_platform()
+from rendercanvas.glfw import RenderCanvas, loop  # noqa: E402
 
 from replica_wgpu import Camera, Renderer
 from replica_wgpu.scene import read_ply
