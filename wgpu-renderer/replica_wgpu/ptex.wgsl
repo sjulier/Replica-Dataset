@@ -32,6 +32,9 @@ struct SubMeshInfo {
 @group(1) @binding(3) var<storage, read> adjacency: array<u32>;  // 4 entries per face
 @group(1) @binding(4) var atlas: texture_2d<f32>;
 
+// Object id per face, for fs_object only (see Renderer.render_objects).
+@group(2) @binding(0) var<storage, read> face_object: array<u32>;
+
 // Triangle-strip order of mesh-ptex.geom (v1, v0, v2, v3) as a triangle list.
 var<private> CORNER: array<u32, 6> = array<u32, 6>(1u, 0u, 2u, 2u, 0u, 3u);
 var<private> UV: array<vec2<f32>, 4> = array<vec2<f32>, 4>(
@@ -205,6 +208,12 @@ fn shade(in: VsOut) -> FsOut {
 @fragment
 fn fs_main(in: VsOut) -> FsOut {
     return shade(in);
+}
+
+// The annotated object each pixel shows (0xFFFFFFFF where there is nothing).
+@fragment
+fn fs_object(in: VsOut) -> @location(0) u32 {
+    return face_object[in.face];
 }
 
 // A separate entry point so that the main pass, without discard, keeps early depth testing.
