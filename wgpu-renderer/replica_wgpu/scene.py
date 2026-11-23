@@ -42,6 +42,7 @@ class SubMesh:
     quads: np.ndarray  # (F, 4) uint32, indices into positions; face i <-> atlas tile i
     adjacency: np.ndarray  # (F, 4) uint32, per edge: (rot << 30) | adjacent face
     atlas_path: str
+    faces: np.ndarray | None = None  # (F,) uint32: this sub-mesh's faces as indices into mesh.ply
 
 
 @dataclass
@@ -115,6 +116,85 @@ def read_sorted_faces(path: str) -> list[np.ndarray]:
         pos += 4 * m
     if pos != raw.size:
         raise ValueError(f"{path}: {raw.size - pos} trailing bytes")
+    return out
+
+
+def read_face_objects(path: str, num_faces: int) -> np.ndarray:
+    """Object id of each face of mesh.ply, from habitat/mesh_semantic.ply.
+
+    That file (replica-instance-mesh-format) has the same vertices and quads as mesh.ply,
+    in the same order, with a per-face uint16 object_id after each face's indices.
+    """
+    with open(path, "rb") as f:
+        header = []
+        while True:
+            line = f.readline()
+            if not line:
+                raise ValueError(f"{path}: no end_header")
+            header.append(line.decode("ascii", "replace").strip())
+            if header[-1] == "end_header":
+                break
+        sizes = {"float": 4, "uchar": 1, "uint8": 1, "uint16": 2, "ushort": 2, "int": 4, "uint32": 4, "uint": 4}
+        counts, vertex_bytes, element = {}, 0, None
+        for words in (h.split() for h in header):
+            if words[:1] == ["element"]:
+                element = words[1]
+                counts[element] = int(words[2])
+            elif words[:1] == ["property"] and element == "vertex":
+                vertex_bytes += sizes[words[1]]
+        if "property list uint8 uint32 vertex_indices" not in header or "property uint16 object_id" not in header:
+            raise ValueError(f"{path}: not the expected replica instance mesh format")
+        if counts.get("face") != num_faces:
+            raise ValueError(f"{path}: {counts.get('face')} faces, mesh.ply has {num_faces}")
+        f.seek(counts["vertex"] * vertex_bytes, os.SEEK_CUR)
+        rec = np.dtype([("n", "u1"), ("v", "<u4", (4,)), ("object", "<u2")])
+        faces = np.frombuffer(f.read(num_faces * rec.itemsize), dtype=rec)
+    if faces.size != num_faces or not (faces["n"] == 4).all():
+        raise ValueError(f"{path}: expected {num_faces} quads")
+    return faces["object"].astype(np.int32)
+
+
+@dataclass
+class SceneObject:
+    """An annotated object of a Replica scene (habitat/info_semantic.json), as a box in the
+    coordinates of mesh.ply: corner k is center + rotation @ (signs_k * sizes / 2)."""
+    id: int
+    class_name: str
+    center: np.ndarray    # (3,) box centre
+    sizes: np.ndarray     # (3,) edge lengths along the box's own axes, metres
+    rotation: np.ndarray  # (3, 3) the box's axes as columns
+
+    @property
+    def volume(self) -> float:
+        return float(np.prod(self.sizes))
+
+
+def _quaternion_matrix(q) -> np.ndarray:
+    x, y, z, w = np.asarray(q, dtype=np.float64) / np.linalg.norm(q)
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+def load_objects(scene_dir: str) -> dict[int, SceneObject]:
+    """The scene's annotated objects by id: the ids that Renderer.render_objects() returns.
+
+    In the file each box's "center" is given in the box's own frame: the centre in mesh
+    coordinates is its orientation (a quaternion x, y, z, w) applied to it. Checked on
+    room_0: that lands within 3 mm (median) of the centre of each object's faces.
+    """
+    with open(os.path.join(scene_dir, "habitat", "info_semantic.json")) as f:
+        info = json.load(f)
+    out = {}
+    for o in info["objects"]:
+        box = o["oriented_bbox"]
+        R = _quaternion_matrix(box["orientation"]["rotation"])
+        t = np.array(box["orientation"].get("translation", [0, 0, 0]), dtype=np.float64)
+        out[int(o["id"])] = SceneObject(
+            id=int(o["id"]), class_name=o["class_name"],
+            center=R @ np.array(box["abb"]["center"], dtype=np.float64) + t,
+            sizes=np.array(box["abb"]["sizes"], dtype=np.float64),
+            rotation=R)
     return out
 
 
@@ -197,6 +277,7 @@ def load_scene(scene_dir: str) -> Scene:
                 quads=local_quads,
                 adjacency=compute_adjacency(local_quads),
                 atlas_path=hdr,
+                faces=faces,
             )
         )
     return Scene(submeshes=submeshes, tile_size=tile_size, is_hdr=is_hdr)

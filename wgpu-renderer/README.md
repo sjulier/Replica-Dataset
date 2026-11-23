@@ -36,8 +36,9 @@ By default the renderer takes the fastest adapter. `--adapter` (on `view`, `rend
 `benchmark.py`), `Renderer(..., adapter=...)` or the `REPLICA_ADAPTER` environment variable
 picks another: an adapter type (`discrete-gpu`, `integrated-gpu`, `cpu`), a backend (`vulkan`,
 `metal`, `d3d12`) or any part of a device name (`5090`, `radv`, `llvmpipe`), ignoring case.
-`cpu` is a software rasteriser where one is installed (Mesa's llvmpipe on Linux), for machines
-without a usable GPU. A name that matches nothing fails with the list of adapters present. The
+`cpu` is a software rasteriser where one is installed (Mesa's llvmpipe on Linux, Microsoft's
+Basic Render Driver on Windows), for machines without a usable GPU. When a name matches several
+adapters, a discrete GPU is preferred to an integrated one, and OpenGL adapters come last. A name that matches nothing fails with the list of adapters present. The
 startup line `GPU: ...` shows which one is in use.
 
 Off-screen rendering (`render`, `benchmark.py`, the Python API, the tests) works on any adapter.
@@ -65,9 +66,33 @@ have no title bar (Esc still quits, and the frame rate is printed in the termina
 `REPLICA_GLFW_PLATFORM=x11` opens it through XWayland instead, with a title bar;
 `REPLICA_GLFW_PLATFORM=wayland` leaves GLFW's defaults alone.
 
+## Object ids and annotations
+
+`Renderer.render_objects(T)` returns which annotated object each pixel shows, as an (H, W)
+int32 image of object ids (-1 where there is nothing), and `Renderer.objects()` the objects
+themselves: id, class name (`sofa`, `table`, `cushion`, ...) and an oriented box in the
+coordinates of `mesh.ply` (`center`, `sizes`, `rotation` with the box's axes as columns,
+`volume`). For room_0 that is 92 objects in 29 classes.
+
+```python
+ids = r.render_objects(T_world_camera)        # same camera and pose as r.render()
+objects = r.objects()
+print({objects[i].class_name for i in np.unique(ids) if i in objects})
+```
+
+The ids come from `habitat/mesh_semantic.ply`, which has the same vertices and faces as
+`mesh.ply` in the same order plus an object id per face; the boxes from
+`habitat/info_semantic.json`, whose box centres are stored in each box's own frame (checked on
+room_0: rotated into mesh coordinates they lie within 3 mm, median, of the centre of each
+object's faces, and 99.6% or more of each object's vertices fall inside its box). Both files
+come with `additional_habitat_configs.zip`. Nothing is loaded until the first
+`render_objects()`; the pass then costs about 1 ms per 1200x680 frame on an RTX 5090 and
+4 bytes of GPU memory per face. Mirrors are not drawn in it.
+
 ## Data needed per scene
 
-`mesh.ply`, `textures/` and **`habitat/sorted_faces.bin`**. The last is not in the main Replica
+`mesh.ply`, `textures/` and **`habitat/sorted_faces.bin`** (plus `habitat/mesh_semantic.ply` and
+`habitat/info_semantic.json` for object ids). The last is not in the main Replica
 archive but in `additional_habitat_configs.zip` (which `download.sh` also fetches). It is
 required: atlas tile *i* holds face *i* of its sub-mesh in the order produced by ReplicaSDK's
 unstable `std::sort`, which cannot be reproduced (see below).
@@ -199,12 +224,36 @@ One desktop (Ryzen 9 9950X, 32 threads) with three adapters, chosen with `--adap
 - All three adapters pass the full test suite, including the comparison with NICE-SLAM's
   frames (`REPLICA_ADAPTER=... pytest`).
 
+### Windows laptop (room_0, 1200×680, 2026-11-14)
+
+One laptop (i7-13850HX, 32 GB, NVIDIA RTX 2000 Ada and Intel integrated graphics), natively on
+Windows 11 and under WSL2 (Ubuntu). Single runs of `benchmark.py`, `rgba16float` unless noted:
+
+| system, adapter | startup | frame | peak process memory |
+|---|---|---|---|
+| Windows, default: NVIDIA RTX 2000 Ada (Vulkan) | 4.8 s | 8.3 ms (120 fps) | 1.0 GB |
+| the same with `--atlas rgb9e5` | 21.0 s | 7.9 ms | 0.9 GB |
+| Windows, Intel integrated (Vulkan) | | 16.9 to 20.3 ms | 4.3 GB |
+| Windows, Intel integrated (D3D12) | 5.9 s | 23.4 ms | 4.4 GB |
+| Windows, Microsoft Basic Render Driver (D3D12, software) | 4.6 s | 368 ms (2.7 fps) | 3.9 GB |
+| WSL2, llvmpipe (the only adapter there) | 3.4 s | 222 ms (4.5 fps) | 4.3 GB |
+| the same with `--atlas rgb9e5` | 14.7 s | 222 ms | 2.4 GB |
+
+- All 29 tests pass on both, including the comparison with NICE-SLAM's frames.
+- The viewer opens on Windows (60 fps, the display's rate, on either GPU and on D3D12 or
+  Vulkan) and under WSLg (1 to 3 fps on llvmpipe, no crash).
+- **Under WSL2 wgpu sees no GPU**, only llvmpipe, so a WSL2 student renders in software:
+  enough to pre-render sequences, too slow to drive interactively. Native Windows uses the GPU.
+- On an integrated GPU the textures count as process memory (4.3 GB); use `--atlas rgb9e5`
+  on machines short of memory, at the price of a longer startup.
+- These runs were made before `--adapter` preferred a discrete GPU among several matches:
+  `d3d12` and `vulkan` then chose the Intel, which is why NVIDIA on D3D12 has no row.
+
 ## Status and limitations
 
-- Tested on an Apple M1 (Metal) and one Linux desktop (Vulkan: NVIDIA, AMD integrated and
-  llvmpipe). Windows (D3D12), WSL2 and a real low-spec laptop are untested. On WSLg, pyslam
-  found wgpu's default surface path crashes and uses software Vulkan for Rerun; off-screen
-  rendering (no surface) may avoid that, but the viewer window would not.
+- Tested on an Apple M1 (Metal), one Linux desktop (Vulkan: NVIDIA, AMD integrated and
+  llvmpipe) and one Windows laptop (Vulkan and D3D12 natively; llvmpipe under WSL2). A real
+  low-spec laptop, Linux arm64 and NVIDIA on D3D12 are untested.
 - Validated against one scene (room_0) through NICE-SLAM's frames; other scenes, and the
   remaining 1.6 mm median depth difference (pixel-centre convention or quantisation), not yet
   investigated.

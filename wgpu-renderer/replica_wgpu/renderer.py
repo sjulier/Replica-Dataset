@@ -18,7 +18,8 @@ import numpy as np
 import wgpu
 
 from .mirrors import MASK_SIZE, MirrorSurface, load_mirrors
-from .scene import Scene, load_hdr_atlas, load_hdr_atlas_rgb9e5, load_scene
+from .scene import (Scene, SceneObject, load_hdr_atlas, load_hdr_atlas_rgb9e5, load_objects, load_scene,
+                    read_face_objects)
 
 # Atlas formats on the GPU: (wgpu format, loader, bytes per texel)
 ATLAS_FORMATS = {
@@ -107,9 +108,10 @@ def match_adapter(spec: str, infos: list[dict]) -> int:
     `spec` is matched without regard to case or punctuation: first as a whole
     adapter type ("discrete-gpu", "integrated-gpu", "cpu") or backend ("vulkan",
     "metal", "d3d12", "opengl"), otherwise as part of the device name, type or
-    backend ("5090", "llvmpipe", "radv"). When several match, the first that is
-    not OpenGL wins: a GPU is often listed a second time as an OpenGL adapter,
-    which lacks features the renderer needs.
+    backend ("5090", "llvmpipe", "radv"). When several match, OpenGL adapters come
+    last (a GPU is often listed a second time as an OpenGL adapter, which lacks
+    features the renderer needs), then a discrete GPU is preferred to an integrated
+    one and that to anything else: "d3d12" on a laptop means its fast GPU on D3D12.
     """
     want = _norm(spec)
     fields = [[_norm(i.get(k, "")) for k in ("adapter_type", "backend_type", "device")] for i in infos]
@@ -119,7 +121,9 @@ def match_adapter(spec: str, infos: list[dict]) -> int:
     if not hits:
         listing = "\n".join(f"  {describe_adapter(i)}" for i in infos) or "  (none)"
         raise ValueError(f"no GPU adapter matches {spec!r}. Available:\n{listing}")
-    hits.sort(key=lambda n: fields[n][1] == "opengl")  # stable: keeps the listed order otherwise
+    speed = {"discretegpu": 0, "integratedgpu": 1}
+    # stable: keeps the listed order among equals
+    hits.sort(key=lambda n: (fields[n][1] == "opengl", speed.get(fields[n][0], 2)))
     return hits[0]
 
 
@@ -158,8 +162,12 @@ class Renderer:
         self.draw_mirrors = mirrors
         self.mirror_depth = mirror_depth
         self.verbose = verbose
+        self.scene_dir = scene_dir
+        self._objects = None  # built on the first render_objects()
         t0 = time.perf_counter()
         scene = load_scene(scene_dir)
+        self._submesh_faces = [sm.faces for sm in scene.submeshes]
+        self._num_faces = sum(sm.quads.shape[0] for sm in scene.submeshes)
         self._log(f"loaded mesh: {len(scene.submeshes)} sub-meshes, "
                   f"{sum(s.quads.shape[0] for s in scene.submeshes)} quads ({time.perf_counter() - t0:.1f} s)")
         self.tile_size = scene.tile_size
@@ -495,6 +503,79 @@ class Renderer:
                 rp.set_pipeline(depth_pipeline)
                 rp.draw(6)
             rp.end()
+
+    # ---- object ids ---------------------------------------------------------
+
+    def objects(self) -> dict[int, SceneObject]:
+        """The scene's annotated objects (class, box) by the ids render_objects() returns."""
+        return load_objects(self.scene_dir)
+
+    def _object_setup(self):
+        """Load habitat/mesh_semantic.ply and build the id pass, once. About 4 bytes of GPU
+        memory per face; nothing is loaded unless render_objects() is used."""
+        if self._objects is None:
+            d = self.device
+            t0 = time.perf_counter()
+            face_object = read_face_objects(os.path.join(self.scene_dir, "habitat", "mesh_semantic.ply"),
+                                            self._num_faces)
+            layout = d.create_bind_group_layout(entries=[
+                {"binding": 0, "visibility": wgpu.ShaderStage.FRAGMENT,
+                 "buffer": {"type": wgpu.BufferBindingType.read_only_storage}}])
+            groups = []
+            for faces in self._submesh_faces:
+                ids = face_object[faces] if faces is not None else face_object
+                buf = d.create_buffer_with_data(data=np.ascontiguousarray(ids.astype(np.uint32)).tobytes(),
+                                                usage=wgpu.BufferUsage.STORAGE)
+                groups.append(d.create_bind_group(layout=layout, entries=[
+                    {"binding": 0, "resource": {"buffer": buf}}]))
+            pipeline = d.create_render_pipeline(
+                layout=d.create_pipeline_layout(bind_group_layouts=[self.frame_layout, self.mesh_layout, layout]),
+                vertex={"module": self._module, "entry_point": "vs_main", "buffers": []},
+                primitive={"topology": wgpu.PrimitiveTopology.triangle_list,
+                           "front_face": wgpu.FrontFace.cw, "cull_mode": self._cull},
+                depth_stencil={"format": wgpu.TextureFormat.depth32float, "depth_write_enabled": True,
+                               "depth_compare": wgpu.CompareFunction.less},
+                multisample=None,
+                fragment={"module": self._module, "entry_point": "fs_object",
+                          "targets": [{"format": wgpu.TextureFormat.r32uint}]},
+            )
+            c = self.camera
+            tex = d.create_texture(size=(c.width, c.height, 1), format=wgpu.TextureFormat.r32uint,
+                                   usage=wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC)
+            self._objects = (groups, pipeline, tex)
+            self._log(f"object ids: {np.unique(face_object).size} objects ({time.perf_counter() - t0:.1f} s)")
+        return self._objects
+
+    def render_objects(self, T_world_camera: np.ndarray) -> np.ndarray:
+        """The annotated object seen at each pixel: (H,W) int32 ids, -1 where there is nothing.
+
+        Ids are those of habitat/info_semantic.json (see objects()). Mirrors are not drawn
+        (each pixel shows the surface itself, as `surface` depth does). A separate pass,
+        so it costs about as much again as render().
+        """
+        groups, pipeline, tex = self._object_setup()
+        c, d = self.camera, self.device
+        T = np.asarray(T_world_camera, dtype=np.float64)
+        mv = np.linalg.inv(T)
+        d.queue.write_buffer(self.frame_buf, 0, self._frame_uniform(c.projection() @ mv, mv, _NO_CLIP))
+        enc = d.create_command_encoder()
+        rp = enc.begin_render_pass(
+            color_attachments=[{"view": tex.create_view(), "load_op": wgpu.LoadOp.clear,
+                                "store_op": wgpu.StoreOp.store, "clear_value": (0xFFFFFFFF, 0, 0, 0)}],
+            depth_stencil_attachment={"view": self.zbuffer.create_view(), "depth_clear_value": 1.0,
+                                      "depth_load_op": wgpu.LoadOp.clear,
+                                      "depth_store_op": wgpu.StoreOp.discard},
+        )
+        rp.set_pipeline(pipeline)
+        rp.set_bind_group(0, self.frame_group)
+        for sm, group in zip(self.submeshes, groups):
+            rp.set_bind_group(1, sm.bind_group)
+            rp.set_bind_group(2, group)
+            rp.draw(sm.num_vertices)
+        rp.end()
+        d.queue.submit([enc.finish()])
+        raw = d.queue.read_texture({"texture": tex}, {"bytes_per_row": c.width * 4}, (c.width, c.height, 1))
+        return np.frombuffer(raw, dtype=np.int32).reshape(c.height, c.width).copy()
 
     def render(self, T_world_camera: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Render colour (H,W,3 uint8) and depth along the optical axis (H,W float32, metres; 0 = nothing)."""
