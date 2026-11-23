@@ -88,8 +88,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/2b/c6/67fcf94c78fd6006529887b43ca99e6ecbdbfb6df100cd4d85b4627402ac/wgpu-0.33.0-py3-none-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b1/db/dceb9dd5b231e1da801793f8acc9f3c52a7e1afe40bb1aae37e02b0faad5/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/c9/809e3c95a16597395a32e3efad3221d77fa36106473b290a95aa1f0306d1/rendercanvas-3.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/cc/b2/ee7afd7e84bc1a8a490710c3c0a7ad472b57f17909549dc7400d17f19c8b/glfw-2.11.0-py2.py3-none-manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/f1/4e/492bc856902c7fa9e10e00e5f3136afc8890f37a5b838f4fc52847af100a/rendercanvas-2.7.2-py3-none-any.whl
       linux-aarch64:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/_openmp_mutex-4.5-20_gnu.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/bzip2-1.0.8-h4777abc_10.conda
@@ -150,8 +150,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/44/de/f98430906df1545ffde0d543dd124a7a439bc2cd32b36b9c53f805df7333/cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/a6/8a/d1d157f9d7a850c7490c70e7f750214f8725a171f766dc34470f7a616a22/wgpu-0.33.0-py3-none-manylinux_2_28_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/c9/809e3c95a16597395a32e3efad3221d77fa36106473b290a95aa1f0306d1/rendercanvas-3.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ca/36/ca10753be547d78250aed12532ec8839f19bbeb5adac11ee8153ef59ce4f/glfw-2.11.0-py2.py3-none-manylinux_2_28_aarch64.whl
-      - pypi: https://files.pythonhosted.org/packages/f1/4e/492bc856902c7fa9e10e00e5f3136afc8890f37a5b838f4fc52847af100a/rendercanvas-2.7.2-py3-none-any.whl
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/colorama-0.4.6-pyhd8ed1ab_1.conda
@@ -210,7 +210,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/94/36/b5652fa7e44e33ac476b2a74a2236bbe69fd6d712056dc717db4ff28120a/wgpu-0.33.0-py3-none-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/ac/2c/dc36e841a6a0db69c19db71a8fb4bbb211924bcf587735caea8afdd230ed/glfw-2.11.0-py2.py3-none-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/f1/4e/492bc856902c7fa9e10e00e5f3136afc8890f37a5b838f4fc52847af100a/rendercanvas-2.7.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/c9/809e3c95a16597395a32e3efad3221d77fa36106473b290a95aa1f0306d1/rendercanvas-3.0.1-py3-none-any.whl
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/colorama-0.4.6-pyhd8ed1ab_1.conda
@@ -266,9 +266,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_7.conda
       - pypi: https://files.pythonhosted.org/packages/78/d6/b0d9d83177397c018efa3579c54990f8d9b3af17fdcf97b0e549609a0571/glfw-2.11.0-py2.py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/c9/809e3c95a16597395a32e3efad3221d77fa36106473b290a95aa1f0306d1/rendercanvas-3.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/c8/b0/92c91610b14158f53b2b4cb213ace4fd017fd87822c96c2ec46936709617/wgpu-0.33.0-py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/d9/79/615cc094e2fb508cade7de88d3b4f6c4ec2bab695c97bce9153dc65aadf5/cffi-2.1.1-cp312-cp312-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/f1/4e/492bc856902c7fa9e10e00e5f3136afc8890f37a5b838f4fc52847af100a/rendercanvas-2.7.2-py3-none-any.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
   build_number: 20
@@ -3235,6 +3235,41 @@ packages:
   version: '3.12'
   sha256: a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e
   requires_python: '>=3.11'
+- pypi: https://files.pythonhosted.org/packages/b7/c9/809e3c95a16597395a32e3efad3221d77fa36106473b290a95aa1f0306d1/rendercanvas-3.0.1-py3-none-any.whl
+  name: rendercanvas
+  version: 3.0.1
+  sha256: b574258ebe54e120304ba20702fee6d825a9ad701afa0c247b367d988d8cb40b
+  requires_dist:
+  - numpy
+  - rendercanvas[lint,tests,examples,docs] ; extra == 'dev'
+  - flit ; extra == 'docs'
+  - sphinx>7.2 ; extra == 'docs'
+  - sphinx-rtd-theme ; extra == 'docs'
+  - sphinx-gallery ; extra == 'docs'
+  - wgpu ; extra == 'docs'
+  - blessed ; extra == 'docs'
+  - flit ; extra == 'examples'
+  - numpy ; extra == 'examples'
+  - wgpu ; extra == 'examples'
+  - glfw ; extra == 'examples'
+  - pyside6 ; extra == 'examples'
+  - imageio ; extra == 'examples'
+  - pytest ; extra == 'examples'
+  - blessed ; extra == 'examples'
+  - glfw>=1.9 ; extra == 'glfw'
+  - jupyter-rfb>=0.4.2 ; extra == 'jupyter'
+  - simplejpeg ; implementation_name != 'pypy' and extra == 'jupyter'
+  - ruff ; extra == 'lint'
+  - pre-commit ; extra == 'lint'
+  - anywidget ; extra == 'notebook'
+  - simplejpeg ; implementation_name != 'pypy' and extra == 'notebook'
+  - blessed ; extra == 'terminal'
+  - pytest ; extra == 'tests'
+  - wgpu ; extra == 'tests'
+  - glfw ; extra == 'tests'
+  - trio ; extra == 'tests'
+  - simplejpeg ; implementation_name != 'pypy' and extra == 'tests'
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/c8/b0/92c91610b14158f53b2b4cb213ace4fd017fd87822c96c2ec46936709617/wgpu-0.33.0-py3-none-win_amd64.whl
   name: wgpu
   version: 0.33.0
@@ -3304,39 +3339,4 @@ packages:
   sha256: f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a
   requires_dist:
   - pycparser ; implementation_name != 'PyPy'
-  requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/f1/4e/492bc856902c7fa9e10e00e5f3136afc8890f37a5b838f4fc52847af100a/rendercanvas-2.7.2-py3-none-any.whl
-  name: rendercanvas
-  version: 2.7.2
-  sha256: 0d98ca3f59fdf90c2601b6162f239d3beeced64d27d44bacb15c4253b21c4784
-  requires_dist:
-  - numpy
-  - rendercanvas[lint,tests,examples,docs] ; extra == 'dev'
-  - flit ; extra == 'docs'
-  - sphinx>7.2 ; extra == 'docs'
-  - sphinx-rtd-theme ; extra == 'docs'
-  - sphinx-gallery ; extra == 'docs'
-  - wgpu ; extra == 'docs'
-  - blessed ; extra == 'docs'
-  - flit ; extra == 'examples'
-  - numpy ; extra == 'examples'
-  - wgpu ; extra == 'examples'
-  - glfw ; extra == 'examples'
-  - pyside6 ; extra == 'examples'
-  - imageio ; extra == 'examples'
-  - pytest ; extra == 'examples'
-  - blessed ; extra == 'examples'
-  - glfw>=1.9 ; extra == 'glfw'
-  - jupyter-rfb>=0.4.2 ; extra == 'jupyter'
-  - simplejpeg ; implementation_name != 'pypy' and extra == 'jupyter'
-  - ruff ; extra == 'lint'
-  - pre-commit ; extra == 'lint'
-  - anywidget ; extra == 'notebook'
-  - simplejpeg ; implementation_name != 'pypy' and extra == 'notebook'
-  - blessed ; extra == 'terminal'
-  - pytest ; extra == 'tests'
-  - wgpu ; extra == 'tests'
-  - glfw ; extra == 'tests'
-  - trio ; extra == 'tests'
-  - simplejpeg ; implementation_name != 'pypy' and extra == 'tests'
   requires_python: '>=3.10'
