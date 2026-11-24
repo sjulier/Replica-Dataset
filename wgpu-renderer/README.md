@@ -59,6 +59,13 @@ exposure, M to toggle mirrors and glass (on in the viewer), R to reset, Esc to q
 bar shows the frame rate; it is capped at the display's refresh rate (vsync), so a 75 Hz
 monitor shows about 75 fps. It uses [rendercanvas](https://github.com/pygfx/rendercanvas) with GLFW, from prebuilt wheels.
 
+The viewer also runs inside pySLAM's pixi environment (numpy 1.26, rendercanvas 3, GLFW from
+conda-forge). On a Linux Wayland desktop that GLFW crashes in the system's window-decoration
+plugin, so there the viewer switches the plugin off: the window works at full speed but may
+have no title bar (Esc still quits, and the frame rate is printed in the terminal).
+`REPLICA_GLFW_PLATFORM=x11` opens it through XWayland instead, with a title bar;
+`REPLICA_GLFW_PLATFORM=wayland` leaves GLFW's defaults alone.
+
 ## Object ids and annotations
 
 `Renderer.render_objects(T)` returns which annotated object each pixel shows, as an (H, W)
