@@ -191,7 +191,7 @@ fn apply_saturation(c: vec3<f32>, s: f32) -> vec3<f32> {
 
 struct FsOut {
     @location(0) color: vec4<f32>,
-    @location(1) depth: f32,
+    @location(1) depth: u32,  // a f32's bits: r32float is not renderable everywhere (OpenGL, e.g. WSL)
 };
 
 fn shade(in: VsOut) -> FsOut {
@@ -201,7 +201,7 @@ fn shade(in: VsOut) -> FsOut {
     c = pow(max(c, vec3<f32>(0.0)), vec3<f32>(frame.inv_gamma));
     var out: FsOut;
     out.color = vec4<f32>(c, 1.0);
-    out.depth = in.depth;
+    out.depth = bitcast<u32>(in.depth);
     return out;
 }
 

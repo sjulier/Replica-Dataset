@@ -18,7 +18,7 @@ struct Mirror {
 
 @group(0) @binding(0) var<uniform> mirror: Mirror;
 @group(0) @binding(1) var reflection: texture_2d<f32>;
-@group(0) @binding(2) var reflection_depth: texture_2d<f32>;
+@group(0) @binding(2) var reflection_depth: texture_2d<u32>;  // a f32's bits
 @group(0) @binding(3) var mask: texture_2d<f32>;
 @group(0) @binding(4) var mask_sampler: sampler;
 
@@ -46,7 +46,7 @@ fn vs_mirror(@builtin(vertex_index) vi: u32) -> VsOut {
 // Both entry points write both targets; each pipeline masks out the one it leaves alone.
 struct FsOut {
     @location(0) color: vec4<f32>,
-    @location(1) depth: f32,
+    @location(1) depth: u32,  // a f32's bits
 };
 
 @fragment
@@ -58,7 +58,7 @@ fn fs_mirror(in: VsOut) -> FsOut {
     let fresnel = r + (1.0 - r) * pow(1.0 - abs(dot(n, v)), 5.0);
     let c = textureLoad(reflection, vec2<i32>(in.clip.xy), 0);
     let m = textureSample(mask, mask_sampler, in.uv).r;
-    return FsOut(vec4<f32>(c.rgb, fresnel * m), 0.0);
+    return FsOut(vec4<f32>(c.rgb, fresnel * m), 0u);
 }
 
 @fragment
@@ -67,9 +67,9 @@ fn fs_mirror_depth(in: VsOut) -> FsOut {
     if (m < 0.5) {
         discard;
     }
-    var d = 0.0;
+    var d = 0u;
     if (mirror.depth_mode == 0u) {
-        d = textureLoad(reflection_depth, vec2<i32>(in.clip.xy), 0).r;
+        d = textureLoad(reflection_depth, vec2<i32>(in.clip.xy), 0).r;  // bits in, bits out
     }
     return FsOut(vec4<f32>(0.0), d);
 }
