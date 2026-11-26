@@ -32,6 +32,9 @@ ATLAS_FORMATS = {
 #   sensor:  the reflected scene, as a depth sensor sees it (consistent with the colour)
 #   invalid: 0, as the dropouts of real sensors
 MIRROR_DEPTH_MODES = ("surface", "sensor", "invalid")
+# The depth target holds each pixel's float32 depth as its bits: r32float is not a renderable
+# colour format on every backend (OpenGL ES without EXT_color_buffer_float, e.g. WSL's), r32uint is.
+DEPTH_FORMAT = wgpu.TextureFormat.r32uint
 
 _DIR = os.path.dirname(__file__)
 _FRAME_BYTES = 160
@@ -227,8 +230,7 @@ class Renderer:
             {"binding": 0, "visibility": wgpu.ShaderStage.VERTEX | frag,
              "buffer": {"type": wgpu.BufferBindingType.uniform}},
             {"binding": 1, "visibility": frag, "texture": {"sample_type": wgpu.TextureSampleType.float}},
-            {"binding": 2, "visibility": frag,
-             "texture": {"sample_type": wgpu.TextureSampleType.unfilterable_float}},
+            {"binding": 2, "visibility": frag, "texture": {"sample_type": wgpu.TextureSampleType.uint}},
             {"binding": 3, "visibility": frag, "texture": {"sample_type": wgpu.TextureSampleType.float}},
             {"binding": 4, "visibility": frag, "sampler": {"type": wgpu.SamplerBindingType.filtering}},
         ])
@@ -255,7 +257,7 @@ class Renderer:
                            "depth_compare": wgpu.CompareFunction.less},
             multisample=None,
             fragment={"module": module, "entry_point": "fs_clipped" if reflected else "fs_main",
-                      "targets": [{"format": color_format}, {"format": wgpu.TextureFormat.r32float}]},
+                      "targets": [{"format": color_format}, {"format": DEPTH_FORMAT}]},
         )
 
     def _mirror_pipeline(self, color_format: str, depth_pass: bool) -> object:
@@ -264,7 +266,7 @@ class Renderer:
         d, module = self.device, self._mirror_module
         if depth_pass:
             targets = [{"format": color_format, "write_mask": 0},
-                       {"format": wgpu.TextureFormat.r32float}]
+                       {"format": DEPTH_FORMAT}]
         else:
             blend = {
                 "color": {"src_factor": wgpu.BlendFactor.src_alpha,
@@ -274,7 +276,7 @@ class Renderer:
                           "operation": wgpu.BlendOperation.add},
             }
             targets = [{"format": color_format, "blend": blend},
-                       {"format": wgpu.TextureFormat.r32float, "write_mask": 0}]
+                       {"format": DEPTH_FORMAT, "write_mask": 0}]
         return d.create_render_pipeline(
             layout=d.create_pipeline_layout(bind_group_layouts=[self.mirror_layout]),
             vertex={"module": module, "entry_point": "vs_mirror", "buffers": []},
@@ -347,7 +349,7 @@ class Renderer:
         size = (c.width, c.height, 1)
         rt = wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC
         self.color_tex = d.create_texture(size=size, format=wgpu.TextureFormat.rgba8unorm, usage=rt)
-        self.depth_out = d.create_texture(size=size, format=wgpu.TextureFormat.r32float, usage=rt)
+        self.depth_out = d.create_texture(size=size, format=DEPTH_FORMAT, usage=rt)
         self.zbuffer = d.create_texture(size=size, format=wgpu.TextureFormat.depth32float,
                                         usage=wgpu.TextureUsage.RENDER_ATTACHMENT)
 
@@ -357,7 +359,7 @@ class Renderer:
             d, size = self.device, (w, h, 1)
             rt = wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.TEXTURE_BINDING
             color = d.create_texture(size=size, format=wgpu.TextureFormat.rgba8unorm, usage=rt)
-            depth = d.create_texture(size=size, format=wgpu.TextureFormat.r32float, usage=rt)
+            depth = d.create_texture(size=size, format=DEPTH_FORMAT, usage=rt)
             zbuffer = d.create_texture(size=size, format=wgpu.TextureFormat.depth32float,
                                        usage=wgpu.TextureUsage.RENDER_ATTACHMENT)
             groups = [d.create_bind_group(layout=self.mirror_layout, entries=[
@@ -410,7 +412,7 @@ class Renderer:
 
     def draw(self, T_world_camera: np.ndarray, camera: Camera, color_tex, depth_tex, zbuffer_tex) -> None:
         """Render into the given targets (all camera-sized): colour in any format with a
-        pipeline from pipeline_for(), r32float depth, depth32float z-buffer."""
+        pipeline from pipeline_for(), DEPTH_FORMAT depth (a float32's bits), depth32float z-buffer."""
         if self.mirror_depth not in MIRROR_DEPTH_MODES:
             raise ValueError(f"mirror_depth must be one of {MIRROR_DEPTH_MODES}")
         T = np.asarray(T_world_camera, dtype=np.float64)

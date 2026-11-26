@@ -54,6 +54,7 @@ _choose_glfw_platform()
 from rendercanvas.glfw import RenderCanvas, loop  # noqa: E402
 
 from replica_wgpu import Camera, Renderer
+from replica_wgpu.renderer import DEPTH_FORMAT
 from replica_wgpu.scene import read_ply
 
 LOOK_SPEED = 0.005  # radians per pixel dragged
@@ -170,7 +171,7 @@ class Viewer:
         w, h = tex.size[0], tex.size[1]
         if self.targets_size != (w, h):
             d = self.r.device
-            self.depth_tex = d.create_texture(size=(w, h, 1), format=wgpu.TextureFormat.r32float,
+            self.depth_tex = d.create_texture(size=(w, h, 1), format=DEPTH_FORMAT,
                                               usage=wgpu.TextureUsage.RENDER_ATTACHMENT)
             self.zbuf = d.create_texture(size=(w, h, 1), format=wgpu.TextureFormat.depth32float,
                                          usage=wgpu.TextureUsage.RENDER_ATTACHMENT)
